@@ -50,6 +50,31 @@ const EFFORT: &[(&str, &str, u8)] = &[
     ("max", "●", 199),
 ];
 
+/// Where the context turns orange and red, in tokens, by what the model id
+/// contains — Bedrock and Vertex wrap the id in prefixes and suffixes of their
+/// own. Tokens rather than a share of the window: recall falls off after so many
+/// tokens whatever window the model was sold with. The numbers follow the
+/// long-context retrieval scores (MRCR, GraphWalks, Fiction.LiveBench); a model
+/// with none published inherits the ones of its predecessor. The first match
+/// wins, so a version goes above its family.
+const CONTEXT: &[(&str, f64, f64)] = &[
+    ("claude-fable-5", 250_000.0, 500_000.0),
+    ("claude-mythos-5", 250_000.0, 500_000.0),
+    ("claude-opus-5", 250_000.0, 500_000.0),
+    // Recall of 4.7 at 256K fell to 59% from 92% on 4.6; 4.8 won it back.
+    ("claude-opus-4-7", 120_000.0, 200_000.0),
+    ("claude-opus-4", 250_000.0, 500_000.0),
+    ("claude-sonnet-5", 200_000.0, 400_000.0),
+    ("claude-sonnet-4-6", 200_000.0, 400_000.0),
+    ("claude-sonnet-4", 100_000.0, 150_000.0),
+    ("claude-haiku-4", 80_000.0, 130_000.0),
+];
+/// Near the end of the window Claude Code compacts the conversation whatever
+/// the model could have held — and a model we do not know is painted by this
+/// alone.
+const CONTEXT_WINDOW_ORANGE: f64 = 60.0;
+const CONTEXT_WINDOW_RED: f64 = 85.0;
+
 /// Prints the line — the default mode, and the one settings.json points at.
 pub fn run(update_mark: Option<String>) {
     let mut input = String::new();
@@ -101,6 +126,28 @@ fn compose(
             Some((_, mark, color)) => parts.push(colorized(&format!("{name} {mark}"), *color)),
             None => parts.push(name.to_string()),
         }
+    }
+
+    // Right after the model: the context belongs to this session, the windows
+    // that follow belong to the account.
+    if let Some(used) = session
+        .pointer("/context_window/used_percentage")
+        .and_then(Value::as_f64)
+    {
+        let color = context_color(
+            used,
+            session
+                .pointer("/context_window/context_window_size")
+                .and_then(Value::as_f64),
+            session
+                .pointer("/model/id")
+                .and_then(Value::as_str)
+                .unwrap_or_default(),
+        );
+        parts.push(format!(
+            "ctx {}",
+            labeled_bar(used, &percent_label(used), color)
+        ));
     }
 
     let five = limits.get("five_hour");
@@ -244,6 +291,27 @@ fn usage_color(percentage: f64) -> u8 {
         percentage if percentage >= 60.0 => ORANGE,
         _ => GREEN,
     }
+}
+
+/// The worse of two colors: by the tokens the model can keep track of, and by
+/// the share of the window.
+fn context_color(used: f64, window: Option<f64>, model: &str) -> u8 {
+    let level = |value: f64, orange: f64, red: f64| match value {
+        value if value >= red => 2,
+        value if value >= orange => 1,
+        _ => 0,
+    };
+
+    let by_share = level(used, CONTEXT_WINDOW_ORANGE, CONTEXT_WINDOW_RED);
+    let by_tokens = match (
+        window,
+        CONTEXT.iter().find(|(name, _, _)| model.contains(name)),
+    ) {
+        (Some(window), Some((_, orange, red))) => level(used / 100.0 * window, *orange, *red),
+        _ => 0,
+    };
+
+    [GREEN, ORANGE, RED][by_share.max(by_tokens)]
 }
 
 fn colorized(text: &str, color: u8) -> String {
@@ -393,6 +461,67 @@ mod tests {
 
         let session = json!({"model": {"display_name": "Opus 5"}});
         assert_eq!(plain(&compose(&session, &Map::new(), None, 0.0)), "Opus 5");
+    }
+
+    #[test]
+    fn shows_how_full_the_context_is_right_after_the_model() {
+        let session = json!({
+            "model": {"id": "claude-opus-5", "display_name": "Opus 5"},
+            "context_window": {"used_percentage": 12, "context_window_size": 1_000_000},
+        });
+        let limits = limits_of(json!({"five_hour": {"used_percentage": 42.0}}));
+        let line = plain(&compose(&session, &limits, None, 0.0));
+
+        let (model, context, five) = (
+            line.find("Opus 5").unwrap(),
+            line.find("ctx").unwrap(),
+            line.find("5h").unwrap(),
+        );
+        assert!(model < context && context < five, "{line}");
+        assert!(line.contains("12%"), "{line}");
+    }
+
+    #[test]
+    fn leaves_out_the_context_before_claude_code_has_counted_it() {
+        let session = json!({
+            "model": {"id": "claude-opus-5", "display_name": "Opus 5"},
+            "context_window": {"used_percentage": null, "context_window_size": 1_000_000},
+        });
+        assert_eq!(plain(&compose(&session, &Map::new(), None, 0.0)), "Opus 5");
+    }
+
+    #[test]
+    fn paints_the_context_by_the_tokens_the_model_can_hold() {
+        let million = Some(1_000_000.0);
+        assert_eq!(context_color(20.0, million, "claude-opus-5"), GREEN);
+        assert_eq!(context_color(30.0, million, "claude-opus-5"), ORANGE);
+        assert_eq!(context_color(55.0, million, "claude-opus-5"), RED);
+
+        // A version that holds less than its family is not painted by the family.
+        assert_eq!(context_color(15.0, million, "claude-opus-4-8"), GREEN);
+        assert_eq!(context_color(15.0, million, "claude-opus-4-7"), ORANGE);
+        assert_eq!(
+            context_color(25.0, million, "us.anthropic.claude-opus-4-7"),
+            RED
+        );
+
+        let small = Some(200_000.0);
+        assert_eq!(context_color(35.0, small, "claude-haiku-4-5"), GREEN);
+        assert_eq!(context_color(45.0, small, "claude-haiku-4-5"), ORANGE);
+        assert_eq!(context_color(70.0, small, "claude-haiku-4-5"), RED);
+    }
+
+    #[test]
+    fn paints_the_context_by_the_window_where_the_tokens_say_nothing() {
+        let small = Some(200_000.0);
+        // The tokens of Opus 5 do not fit a small window: its end decides.
+        assert_eq!(context_color(59.0, small, "claude-opus-5"), GREEN);
+        assert_eq!(context_color(60.0, small, "claude-opus-5"), ORANGE);
+        assert_eq!(context_color(85.0, small, "claude-opus-5"), RED);
+
+        assert_eq!(context_color(59.0, Some(1_000_000.0), "some-model"), GREEN);
+        assert_eq!(context_color(85.0, Some(1_000_000.0), "some-model"), RED);
+        assert_eq!(context_color(70.0, None, "claude-haiku-4-5"), ORANGE);
     }
 
     #[test]
