@@ -55,10 +55,12 @@ claudestatus version    print the version
 
 ## The status line
 
-The model, the current `/effort` level, the five-hour window, the time until it
-resets and the weekly window. The circle next to the model fills up from `low`
-(`○`) to `max` (`●`). The color of the bars follows usage: green up to 60%,
-orange up to 85%, red above.
+The model, the current `/effort` level, how full the context is, the five-hour
+window, the time until it resets and the weekly window. The circle next to the
+model fills up from `low` (`○`) to `max` (`●`). The color of the limit bars
+follows usage: green up to 60%, orange up to 85%, red above. The context bar
+turns orange and red at the point where the current model starts to lose track
+of a long conversation.
 
 ## Divoom Times Gate
 
