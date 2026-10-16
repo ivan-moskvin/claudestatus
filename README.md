@@ -57,8 +57,11 @@ claudestatus version    print the version
 
 The model, the current `/effort` level, how full the context is, the five-hour
 window, the time until it resets and the weekly window. The circle next to the
-model fills up from `low` (`○`) to `max` (`●`). The color of the limit bars
-follows usage: green up to 60%, orange up to 85%, red above. The context bar
+model fills up from `low` (`○`) to `max` (`●`). The five-hour bar is
+green up to 60%, orange up to 85%, red above. The weekly bar is painted by pace
+against the thin line under it, the part of the week that has passed: green
+while usage is behind it, orange when level with it or one cell ahead, red two
+or more cells ahead. The context bar
 turns orange and red at the point where the current model starts to lose track
 of a long conversation.
 
