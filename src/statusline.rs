@@ -171,6 +171,9 @@ fn compose(
     // The weekly window goes last: it moves slowly and gets in the way of what
     // matters right now.
     let week = limits.get("seven_day");
+    let week_elapsed = week
+        .and_then(|window| seconds_left(window, now))
+        .map(|left| (SEVEN_DAY_SECONDS - left as f64) / SEVEN_DAY_SECONDS * 100.0);
     let mut week_bar_at = None;
 
     if let Some(used) = week.and_then(|window| percentage(window, "used_percentage")) {
@@ -183,7 +186,7 @@ fn compose(
         week_bar_at = Some(width(&drawn) + separator + "7d ".len());
         parts.push(format!(
             "7d {}",
-            labeled_bar(used, &percent_label(used), usage_color(used))
+            labeled_bar(used, &percent_label(used), week_color(used, week_elapsed))
         ));
     }
 
@@ -201,12 +204,8 @@ fn compose(
     // How much of the week has passed goes on a second line, right under the 7d
     // bar: inside the bar there is only room for one value, and two of them side
     // by side is what the eye has to compare here.
-    match (
-        week_bar_at,
-        week.and_then(|window| seconds_left(window, now)),
-    ) {
-        (Some(at), Some(left)) => {
-            let elapsed = (SEVEN_DAY_SECONDS - left as f64) / SEVEN_DAY_SECONDS * 100.0;
+    match (week_bar_at, week_elapsed) {
+        (Some(at), Some(elapsed)) => {
             format!("{line}\n{}{}", INDENT.repeat(at), week_strip(elapsed))
         }
         _ => line,
@@ -289,6 +288,23 @@ fn usage_color(percentage: f64) -> u8 {
     match percentage {
         percentage if percentage >= 85.0 => RED,
         percentage if percentage >= 60.0 => ORANGE,
+        _ => GREEN,
+    }
+}
+
+/// The week is painted by pace rather than by how full it is: 70% on the last
+/// day is fine, 30% on the first is not. Cells are compared, not percentages,
+/// so the color agrees with what the bar and the strip under it show. A week
+/// without a reset time has no pace to compare, and falls back to thresholds.
+fn week_color(used: f64, elapsed: Option<f64>) -> u8 {
+    let Some(elapsed) = elapsed else {
+        return usage_color(used);
+    };
+    let (used, elapsed) = (cells(used) as i64, cells(elapsed) as i64);
+    match used - elapsed {
+        _ if used == 0 => GREEN,
+        ahead if ahead >= 2 => RED,
+        ahead if ahead >= 0 => ORANGE,
         _ => GREEN,
     }
 }
@@ -543,6 +559,25 @@ mod tests {
     }
 
     /// How many of the ten cells the fill covers.
+    #[test]
+    fn paints_the_week_by_its_pace() {
+        assert_eq!(week_color(30.0, Some(60.0)), GREEN);
+        assert_eq!(week_color(50.0, Some(60.0)), GREEN);
+        assert_eq!(week_color(60.0, Some(60.0)), ORANGE);
+        assert_eq!(week_color(70.0, Some(60.0)), ORANGE);
+        assert_eq!(week_color(80.0, Some(60.0)), RED);
+        assert_eq!(week_color(30.0, Some(5.0)), RED);
+        // Nothing to see in the bar yet is nothing to warn about.
+        assert_eq!(week_color(2.0, Some(1.0)), GREEN);
+    }
+
+    #[test]
+    fn paints_a_week_without_a_reset_time_by_how_full_it_is() {
+        assert_eq!(week_color(30.0, None), GREEN);
+        assert_eq!(week_color(70.0, None), ORANGE);
+        assert_eq!(week_color(90.0, None), RED);
+    }
+
     fn filled_cells(bar: &str) -> usize {
         let empty = format!("\x1b[0;48;5;{EMPTY_BG};38;5;{EMPTY_FG}m");
         let (fill, _) = bar
