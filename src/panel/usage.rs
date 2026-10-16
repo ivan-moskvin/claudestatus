@@ -181,6 +181,18 @@ impl Window {
             _ => Rgb::GREEN,
         }
     }
+
+    /// The week is painted by pace against the part of it that has passed, by
+    /// the same rule as in the status line.
+    pub fn week_tint(&self) -> Rgb {
+        if !self.present || self.expired {
+            return Rgb::GREY;
+        }
+        let elapsed = self
+            .timed()
+            .then(|| f64::from(self.elapsed_fraction(SEVEN_DAY_SECONDS)) * 100.0);
+        [Rgb::GREEN, Rgb::ORANGE, Rgb::RED][crate::statusline::week_level(self.used, elapsed)]
+    }
 }
 
 /// Accepts Unix time in seconds or in milliseconds.
@@ -338,6 +350,22 @@ mod tests {
             Rgb::GREY,
             "a window we have no numbers for"
         );
+    }
+
+    #[test]
+    fn paints_the_week_by_its_pace() {
+        let day = 24 * 3600;
+        let week = |used, seconds_left| Window {
+            used,
+            seconds_left,
+            present: true,
+            expired: false,
+        };
+        assert_eq!(week(40.0, 2 * day).week_tint(), Rgb::GREEN);
+        assert_eq!(week(40.0, 4 * day).week_tint(), Rgb::ORANGE);
+        assert_eq!(week(40.0, 6 * day).week_tint(), Rgb::RED);
+        assert_eq!(week(70.0, 0).week_tint(), Rgb::ORANGE, "without a clock");
+        assert_eq!(Window::default().week_tint(), Rgb::GREY);
     }
 
     #[test]
