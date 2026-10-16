@@ -1,6 +1,6 @@
 [package]
 name = "claudestatus"
-version = "2.3.1"
+version = "2.3.2"
 edition = "2024"
 rust-version = "1.88"
 description = "Claude limits in the Claude Code status line"
