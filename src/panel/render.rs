@@ -120,7 +120,7 @@ pub fn draw(state: &Snapshot) -> Result<Frame, String> {
             y,
             WEEK_BAR_HEIGHT,
             week.fraction(),
-            week.tint(),
+            week.week_tint(),
             &week.percent_label(),
         );
         canvas.bar(
@@ -142,7 +142,7 @@ pub fn draw(state: &Snapshot) -> Result<Frame, String> {
             y,
             BAR_HEIGHT,
             week.fraction(),
-            week.tint(),
+            week.week_tint(),
             &week.percent_label(),
         );
     }

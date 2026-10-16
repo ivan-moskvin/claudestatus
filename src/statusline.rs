@@ -285,32 +285,42 @@ fn text_color(color: u8) -> u8 {
 }
 
 fn usage_color(percentage: f64) -> u8 {
+    [GREEN, ORANGE, RED][usage_level(percentage)]
+}
+
+fn usage_level(percentage: f64) -> usize {
     match percentage {
-        percentage if percentage >= 85.0 => RED,
-        percentage if percentage >= 60.0 => ORANGE,
-        _ => GREEN,
+        percentage if percentage >= 85.0 => 2,
+        percentage if percentage >= 60.0 => 1,
+        _ => 0,
     }
 }
 
-/// The week is painted by pace rather than by how full it is: 70% on the last
-/// day is fine, 30% on the first is not. Cells are compared, not percentages,
-/// so the color agrees with what the bar and the strip under it show. A week
-/// without a reset time has no pace to compare, and falls back to thresholds.
 fn week_color(used: f64, elapsed: Option<f64>) -> u8 {
+    [GREEN, ORANGE, RED][week_level(used, elapsed)]
+}
+
+/// How worrying the week is, from 0 (green) to 2 (red); the panel paints its
+/// week by it too. The week is judged by pace rather than by how full it is:
+/// 70% on the last day is fine, 30% on the first is not. Cells are compared,
+/// not percentages, so the color agrees with what the bar and the strip under
+/// it show. A week without a reset time has no pace to compare, and falls back
+/// to thresholds.
+pub fn week_level(used: f64, elapsed: Option<f64>) -> usize {
     let Some(elapsed) = elapsed else {
-        return usage_color(used);
+        return usage_level(used);
     };
     // A spent week is red even on its last day, when the bar and the strip are
     // level: there is nothing left to pace.
     if used >= 100.0 {
-        return RED;
+        return 2;
     }
     let (used, elapsed) = (cells(used) as i64, cells(elapsed) as i64);
     match used - elapsed {
-        _ if used == 0 => GREEN,
-        ahead if ahead >= 2 => RED,
-        ahead if ahead >= 0 => ORANGE,
-        _ => GREEN,
+        _ if used == 0 => 0,
+        ahead if ahead >= 2 => 2,
+        ahead if ahead >= 0 => 1,
+        _ => 0,
     }
 }
 
