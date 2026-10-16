@@ -61,7 +61,7 @@ model fills up from `low` (`○`) to `max` (`●`). The five-hour bar is
 green up to 60%, orange up to 85%, red above. The weekly bar is painted by pace
 against the thin line under it, the part of the week that has passed: green
 while usage is behind it, orange when level with it or one cell ahead, red two
-or more cells ahead. The context bar
+or more cells ahead or once the week is spent. The context bar
 turns orange and red at the point where the current model starts to lose track
 of a long conversation.
 
