@@ -300,6 +300,11 @@ fn week_color(used: f64, elapsed: Option<f64>) -> u8 {
     let Some(elapsed) = elapsed else {
         return usage_color(used);
     };
+    // A spent week is red even on its last day, when the bar and the strip are
+    // level: there is nothing left to pace.
+    if used >= 100.0 {
+        return RED;
+    }
     let (used, elapsed) = (cells(used) as i64, cells(elapsed) as i64);
     match used - elapsed {
         _ if used == 0 => GREEN,
@@ -569,6 +574,8 @@ mod tests {
         assert_eq!(week_color(30.0, Some(5.0)), RED);
         // Nothing to see in the bar yet is nothing to warn about.
         assert_eq!(week_color(2.0, Some(1.0)), GREEN);
+        assert_eq!(week_color(96.0, Some(99.0)), ORANGE);
+        assert_eq!(week_color(100.0, Some(99.0)), RED);
     }
 
     #[test]
