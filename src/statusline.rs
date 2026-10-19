@@ -151,16 +151,17 @@ fn compose(
     }
 
     let five = limits.get("five_hour");
+    let five_left = five.and_then(|window| seconds_left(window, now));
+    let five_elapsed = five_left.map(|left| elapsed_share(left, FIVE_HOUR_SECONDS));
 
     if let Some(used) = five.and_then(|window| percentage(window, "used_percentage")) {
         parts.push(format!(
             "5h {}",
-            labeled_bar(used, &percent_label(used), usage_color(used))
+            labeled_bar(used, &percent_label(used), pace_color(used, five_elapsed))
         ));
     }
 
-    if let Some(left) = five.and_then(|window| seconds_left(window, now)) {
-        let elapsed = (FIVE_HOUR_SECONDS - left as f64) / FIVE_HOUR_SECONDS * 100.0;
+    if let (Some(left), Some(elapsed)) = (five_left, five_elapsed) {
         parts.push(format!(
             "{} {}",
             crate::i18n::t("reset"),
@@ -173,7 +174,7 @@ fn compose(
     let week = limits.get("seven_day");
     let week_elapsed = week
         .and_then(|window| seconds_left(window, now))
-        .map(|left| (SEVEN_DAY_SECONDS - left as f64) / SEVEN_DAY_SECONDS * 100.0);
+        .map(|left| elapsed_share(left, SEVEN_DAY_SECONDS));
     let mut week_bar_at = None;
 
     if let Some(used) = week.and_then(|window| percentage(window, "used_percentage")) {
@@ -186,7 +187,7 @@ fn compose(
         week_bar_at = Some(width(&drawn) + separator + "7d ".len());
         parts.push(format!(
             "7d {}",
-            labeled_bar(used, &percent_label(used), week_color(used, week_elapsed))
+            labeled_bar(used, &percent_label(used), pace_color(used, week_elapsed))
         ));
     }
 
@@ -284,10 +285,6 @@ fn text_color(color: u8) -> u8 {
     if color == RED { LIGHT_TEXT } else { DARK_TEXT }
 }
 
-fn usage_color(percentage: f64) -> u8 {
-    [GREEN, ORANGE, RED][usage_level(percentage)]
-}
-
 fn usage_level(percentage: f64) -> usize {
     match percentage {
         percentage if percentage >= 85.0 => 2,
@@ -296,26 +293,39 @@ fn usage_level(percentage: f64) -> usize {
     }
 }
 
-fn week_color(used: f64, elapsed: Option<f64>) -> u8 {
-    [GREEN, ORANGE, RED][week_level(used, elapsed)]
+fn elapsed_share(seconds_left: i64, window_seconds: f64) -> f64 {
+    (window_seconds - seconds_left as f64) / window_seconds * 100.0
 }
 
-/// How worrying the week is, from 0 (green) to 2 (red); the panel paints its
-/// week by it too. The week is judged by pace rather than by how full it is:
-/// 70% on the last day is fine, 30% on the first is not. Cells are compared,
-/// not percentages, so the color agrees with what the bar and the strip under
-/// it show. A week without a reset time has no pace to compare, and falls back
-/// to thresholds.
-pub fn week_level(used: f64, elapsed: Option<f64>) -> usize {
+fn pace_color(used: f64, elapsed: Option<f64>) -> u8 {
+    [GREEN, ORANGE, RED][pace_level(used, elapsed)]
+}
+
+/// How worrying a window is, from 0 (green) to 2 (red); both the five-hour and
+/// the weekly window are judged by it, here and on the panel. A window is
+/// judged by pace rather than by how full it is: 70% near the reset is fine,
+/// 30% right after it is not. Cells are compared, not percentages, so the color
+/// agrees with what the bar and the time beside it show. A window without a
+/// reset time has no pace to compare, and falls back to thresholds.
+pub fn pace_level(used: f64, elapsed: Option<f64>) -> usize {
     let Some(elapsed) = elapsed else {
         return usage_level(used);
     };
-    // A spent week is red even on its last day, when the bar and the strip are
-    // level: there is nothing left to pace.
+    // A spent window is red even right before its reset, when the bar and the
+    // time are level: there is nothing left to pace.
     if used >= 100.0 {
         return 2;
     }
     let (used, elapsed) = (cells(used) as i64, cells(elapsed) as i64);
+    // While not a single cell of the window has passed, one request can make a
+    // cell of usage on its own: that is too little to tell a pace from.
+    if elapsed == 0 {
+        return match used {
+            0 | 1 => 0,
+            2 => 1,
+            _ => 2,
+        };
+    }
     match used - elapsed {
         _ if used == 0 => 0,
         ahead if ahead >= 2 => 2,
@@ -565,34 +575,70 @@ mod tests {
 
     #[test]
     fn paints_a_bar_by_how_full_it_is() {
-        assert_eq!(usage_color(0.0), GREEN);
-        assert_eq!(usage_color(59.9), GREEN);
-        assert_eq!(usage_color(60.0), ORANGE);
-        assert_eq!(usage_color(84.9), ORANGE);
-        assert_eq!(usage_color(85.0), RED);
-        assert_eq!(usage_color(100.0), RED);
+        assert_eq!(usage_level(0.0), 0);
+        assert_eq!(usage_level(59.9), 0);
+        assert_eq!(usage_level(60.0), 1);
+        assert_eq!(usage_level(84.9), 1);
+        assert_eq!(usage_level(85.0), 2);
+        assert_eq!(usage_level(100.0), 2);
     }
 
     /// How many of the ten cells the fill covers.
     #[test]
-    fn paints_the_week_by_its_pace() {
-        assert_eq!(week_color(30.0, Some(60.0)), GREEN);
-        assert_eq!(week_color(50.0, Some(60.0)), GREEN);
-        assert_eq!(week_color(60.0, Some(60.0)), ORANGE);
-        assert_eq!(week_color(70.0, Some(60.0)), ORANGE);
-        assert_eq!(week_color(80.0, Some(60.0)), RED);
-        assert_eq!(week_color(30.0, Some(5.0)), RED);
+    fn paints_a_window_by_its_pace() {
+        assert_eq!(pace_color(30.0, Some(60.0)), GREEN);
+        assert_eq!(pace_color(50.0, Some(60.0)), GREEN);
+        assert_eq!(pace_color(60.0, Some(60.0)), ORANGE);
+        assert_eq!(pace_color(70.0, Some(60.0)), ORANGE);
+        assert_eq!(pace_color(80.0, Some(60.0)), RED);
+        assert_eq!(pace_color(30.0, Some(5.0)), RED);
         // Nothing to see in the bar yet is nothing to warn about.
-        assert_eq!(week_color(2.0, Some(1.0)), GREEN);
-        assert_eq!(week_color(96.0, Some(99.0)), ORANGE);
-        assert_eq!(week_color(100.0, Some(99.0)), RED);
+        assert_eq!(pace_color(2.0, Some(1.0)), GREEN);
+        assert_eq!(pace_color(96.0, Some(99.0)), ORANGE);
+        assert_eq!(pace_color(100.0, Some(99.0)), RED);
     }
 
     #[test]
-    fn paints_a_week_without_a_reset_time_by_how_full_it_is() {
-        assert_eq!(week_color(30.0, None), GREEN);
-        assert_eq!(week_color(70.0, None), ORANGE);
-        assert_eq!(week_color(90.0, None), RED);
+    fn does_not_judge_the_pace_before_a_cell_of_the_window_has_passed() {
+        assert_eq!(pace_color(12.0, Some(2.0)), GREEN, "one request");
+        assert_eq!(pace_color(20.0, Some(2.0)), ORANGE);
+        assert_eq!(pace_color(30.0, Some(2.0)), RED);
+        assert_eq!(pace_color(100.0, Some(2.0)), RED, "spent at once");
+        // From the first passed cell on the pace counts as usual.
+        assert_eq!(pace_color(20.0, Some(10.0)), ORANGE);
+        assert_eq!(pace_color(30.0, Some(10.0)), RED);
+    }
+
+    #[test]
+    fn paints_a_window_without_a_reset_time_by_how_full_it_is() {
+        assert_eq!(pace_color(30.0, None), GREEN);
+        assert_eq!(pace_color(70.0, None), ORANGE);
+        assert_eq!(pace_color(90.0, None), RED);
+    }
+
+    #[test]
+    fn paints_the_five_hour_bar_by_its_pace_against_the_reset_bar() {
+        let five = 5.0 * 3600.0;
+        let bar_of = |used: f64, now: f64| {
+            let limits = limits_of(json!({
+                "five_hour": {"used_percentage": used, "resets_at": five},
+            }));
+            compose(&json!({}), &limits, None, now)
+        };
+        let painted = |line: &str, color: u8| line.contains(&format!("48;5;{color};"));
+
+        // 70% with four of the five hours gone is behind the clock.
+        let line = bar_of(70.0, five * 0.8);
+        assert!(painted(&line, GREEN), "{line:?}");
+        let line = bar_of(50.0, five * 0.5);
+        assert!(painted(&line, ORANGE), "{line:?}");
+        // 40% within the first hour leaves the window spent long before it resets.
+        let line = bar_of(40.0, five * 0.15);
+        assert!(painted(&line, RED), "{line:?}");
+        // Without a reset time only the thresholds are left.
+        let limits = limits_of(json!({"five_hour": {"used_percentage": 70.0}}));
+        let line = compose(&json!({}), &limits, None, 0.0);
+        assert!(painted(&line, ORANGE), "{line:?}");
     }
 
     fn filled_cells(bar: &str) -> usize {

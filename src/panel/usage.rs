@@ -169,29 +169,18 @@ impl Window {
         format!("{}%", self.used.round() as i64)
     }
 
-    /// The only place with the color thresholds: green up to 60%, orange up to
-    /// 85%, red above — exactly like the status line. Cyan belongs to the reset
-    /// bar alone, because that one shows time and not risk. A window that has
-    /// reset is dimmed.
-    pub fn tint(&self) -> Rgb {
-        match self.used {
-            _ if !self.present || self.expired => Rgb::GREY,
-            used if used >= 85.0 => Rgb::RED,
-            used if used >= 60.0 => Rgb::ORANGE,
-            _ => Rgb::GREEN,
-        }
-    }
-
-    /// The week is painted by pace against the part of it that has passed, by
-    /// the same rule as in the status line.
-    pub fn week_tint(&self) -> Rgb {
+    /// Usage is painted by pace against the part of its window that has
+    /// passed, by the same rule as in the status line. Cyan belongs to the
+    /// reset bar alone, because that one shows time and not risk. A window that
+    /// has reset is dimmed.
+    pub fn tint(&self, window_seconds: f64) -> Rgb {
         if !self.present || self.expired {
             return Rgb::GREY;
         }
         let elapsed = self
             .timed()
-            .then(|| f64::from(self.elapsed_fraction(SEVEN_DAY_SECONDS)) * 100.0);
-        [Rgb::GREEN, Rgb::ORANGE, Rgb::RED][crate::statusline::week_level(self.used, elapsed)]
+            .then(|| f64::from(self.elapsed_fraction(window_seconds)) * 100.0);
+        [Rgb::GREEN, Rgb::ORANGE, Rgb::RED][crate::statusline::pace_level(self.used, elapsed)]
     }
 }
 
@@ -297,7 +286,7 @@ mod tests {
         let five = snapshot.window("five_hour");
         assert!(five.expired);
         assert_eq!(five.used, 0.0);
-        assert_eq!(five.tint(), Rgb::GREY);
+        assert_eq!(five.tint(FIVE_HOUR_SECONDS), Rgb::GREY);
     }
 
     #[test]
@@ -335,18 +324,18 @@ mod tests {
     }
 
     #[test]
-    fn paints_a_window_by_how_full_it_is() {
+    fn paints_a_window_without_a_clock_by_how_full_it_is() {
         let window = |used| Window {
             used,
             present: true,
             ..Default::default()
         };
-        assert_eq!(window(0.0).tint(), Rgb::GREEN);
-        assert_eq!(window(59.9).tint(), Rgb::GREEN);
-        assert_eq!(window(60.0).tint(), Rgb::ORANGE);
-        assert_eq!(window(85.0).tint(), Rgb::RED);
+        assert_eq!(window(0.0).tint(FIVE_HOUR_SECONDS), Rgb::GREEN);
+        assert_eq!(window(59.9).tint(FIVE_HOUR_SECONDS), Rgb::GREEN);
+        assert_eq!(window(60.0).tint(FIVE_HOUR_SECONDS), Rgb::ORANGE);
+        assert_eq!(window(85.0).tint(FIVE_HOUR_SECONDS), Rgb::RED);
         assert_eq!(
-            Window::default().tint(),
+            Window::default().tint(FIVE_HOUR_SECONDS),
             Rgb::GREY,
             "a window we have no numbers for"
         );
@@ -361,11 +350,37 @@ mod tests {
             present: true,
             expired: false,
         };
-        assert_eq!(week(40.0, 2 * day).week_tint(), Rgb::GREEN);
-        assert_eq!(week(40.0, 4 * day).week_tint(), Rgb::ORANGE);
-        assert_eq!(week(40.0, 6 * day).week_tint(), Rgb::RED);
-        assert_eq!(week(70.0, 0).week_tint(), Rgb::ORANGE, "without a clock");
-        assert_eq!(Window::default().week_tint(), Rgb::GREY);
+        assert_eq!(week(40.0, 2 * day).tint(SEVEN_DAY_SECONDS), Rgb::GREEN);
+        assert_eq!(week(40.0, 4 * day).tint(SEVEN_DAY_SECONDS), Rgb::ORANGE);
+        assert_eq!(week(40.0, 6 * day).tint(SEVEN_DAY_SECONDS), Rgb::RED);
+        assert_eq!(
+            week(70.0, 0).tint(SEVEN_DAY_SECONDS),
+            Rgb::ORANGE,
+            "without a clock"
+        );
+        assert_eq!(Window::default().tint(SEVEN_DAY_SECONDS), Rgb::GREY);
+    }
+
+    #[test]
+    fn paints_the_five_hours_by_their_pace() {
+        let minute = 60;
+        let five = |used, seconds_left| Window {
+            used,
+            seconds_left,
+            present: true,
+            expired: false,
+        };
+        assert_eq!(five(70.0, 60 * minute).tint(FIVE_HOUR_SECONDS), Rgb::GREEN);
+        assert_eq!(
+            five(50.0, 150 * minute).tint(FIVE_HOUR_SECONDS),
+            Rgb::ORANGE
+        );
+        assert_eq!(five(40.0, 255 * minute).tint(FIVE_HOUR_SECONDS), Rgb::RED);
+        assert_eq!(
+            five(12.0, 295 * minute).tint(FIVE_HOUR_SECONDS),
+            Rgb::GREEN,
+            "too early to tell a pace"
+        );
     }
 
     #[test]
