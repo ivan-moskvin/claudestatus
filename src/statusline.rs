@@ -301,35 +301,40 @@ fn pace_color(used: f64, elapsed: Option<f64>) -> u8 {
     [GREEN, ORANGE, RED][pace_level(used, elapsed)]
 }
 
+/// How much of a window may pass before its pace is extrapolated. Earlier
+/// than that one heavy request moves the forecast by multiples: 10% is half an
+/// hour of the five-hour window and about seventeen hours of the week.
+const PACE_SETTLES_AT: f64 = 10.0;
+/// A forecast this far over the limit is a risk rather than noise: the window
+/// runs out with about a quarter of it still to go.
+const FORECAST_RED: f64 = 130.0;
+
 /// How worrying a window is, from 0 (green) to 2 (red); both the five-hour and
 /// the weekly window are judged by it, here and on the panel. A window is
-/// judged by pace rather than by how full it is: 70% near the reset is fine,
-/// 30% right after it is not. Cells are compared, not percentages, so the color
-/// agrees with what the bar and the time beside it show. A window without a
-/// reset time has no pace to compare, and falls back to thresholds.
+/// judged by where its pace leads by the reset rather than by how full it is:
+/// 70% near the reset is fine, 30% right after it is not. Percentages are
+/// compared, not cells: a cell is a tenth of the window, and rounding both
+/// sides to it turned 9% of usage at 14% of the week into a warning. A window
+/// without a reset time has no pace to compare, and falls back to thresholds.
 pub fn pace_level(used: f64, elapsed: Option<f64>) -> usize {
     let Some(elapsed) = elapsed else {
         return usage_level(used);
     };
-    // A spent window is red even right before its reset, when the bar and the
-    // time are level: there is nothing left to pace.
+    // A spent window is red even right before its reset: there is nothing
+    // left to pace.
     if used >= 100.0 {
         return 2;
     }
-    let (used, elapsed) = (cells(used) as i64, cells(elapsed) as i64);
-    // While not a single cell of the window has passed, one request can make a
-    // cell of usage on its own: that is too little to tell a pace from.
-    if elapsed == 0 {
+    if elapsed < PACE_SETTLES_AT {
         return match used {
-            0 | 1 => 0,
-            2 => 1,
-            _ => 2,
+            used if used >= 30.0 => 2,
+            used if used >= 15.0 => 1,
+            _ => 0,
         };
     }
-    match used - elapsed {
-        _ if used == 0 => 0,
-        ahead if ahead >= 2 => 2,
-        ahead if ahead >= 0 => 1,
+    match used / elapsed * 100.0 {
+        forecast if forecast > FORECAST_RED => 2,
+        forecast if forecast > 100.0 => 1,
         _ => 0,
     }
 }
@@ -585,28 +590,27 @@ mod tests {
 
     /// How many of the ten cells the fill covers.
     #[test]
-    fn paints_a_window_by_its_pace() {
+    fn paints_a_window_by_where_its_pace_leads() {
+        assert_eq!(pace_color(9.0, Some(14.0)), GREEN, "64% by the reset");
         assert_eq!(pace_color(30.0, Some(60.0)), GREEN);
-        assert_eq!(pace_color(50.0, Some(60.0)), GREEN);
-        assert_eq!(pace_color(60.0, Some(60.0)), ORANGE);
-        assert_eq!(pace_color(70.0, Some(60.0)), ORANGE);
-        assert_eq!(pace_color(80.0, Some(60.0)), RED);
-        assert_eq!(pace_color(30.0, Some(5.0)), RED);
-        // Nothing to see in the bar yet is nothing to warn about.
-        assert_eq!(pace_color(2.0, Some(1.0)), GREEN);
-        assert_eq!(pace_color(96.0, Some(99.0)), ORANGE);
-        assert_eq!(pace_color(100.0, Some(99.0)), RED);
+        assert_eq!(pace_color(50.0, Some(50.0)), GREEN, "exactly the limit");
+        assert_eq!(pace_color(60.0, Some(50.0)), ORANGE);
+        assert_eq!(pace_color(65.0, Some(50.0)), ORANGE);
+        assert_eq!(pace_color(66.0, Some(50.0)), RED);
+        assert_eq!(pace_color(80.0, Some(50.0)), RED);
+        assert_eq!(pace_color(96.0, Some(99.0)), GREEN);
+        assert_eq!(pace_color(100.0, Some(99.0)), RED, "spent");
     }
 
     #[test]
-    fn does_not_judge_the_pace_before_a_cell_of_the_window_has_passed() {
+    fn does_not_extrapolate_the_first_tenth_of_a_window() {
         assert_eq!(pace_color(12.0, Some(2.0)), GREEN, "one request");
         assert_eq!(pace_color(20.0, Some(2.0)), ORANGE);
-        assert_eq!(pace_color(30.0, Some(2.0)), RED);
+        assert_eq!(pace_color(30.0, Some(5.0)), RED);
         assert_eq!(pace_color(100.0, Some(2.0)), RED, "spent at once");
-        // From the first passed cell on the pace counts as usual.
-        assert_eq!(pace_color(20.0, Some(10.0)), ORANGE);
-        assert_eq!(pace_color(30.0, Some(10.0)), RED);
+        // From a tenth of the window on, the forecast counts.
+        assert_eq!(pace_color(12.0, Some(10.0)), ORANGE);
+        assert_eq!(pace_color(14.0, Some(10.0)), RED);
     }
 
     #[test]
@@ -630,7 +634,7 @@ mod tests {
         // 70% with four of the five hours gone is behind the clock.
         let line = bar_of(70.0, five * 0.8);
         assert!(painted(&line, GREEN), "{line:?}");
-        let line = bar_of(50.0, five * 0.5);
+        let line = bar_of(60.0, five * 0.5);
         assert!(painted(&line, ORANGE), "{line:?}");
         // 40% within the first hour leaves the window spent long before it resets.
         let line = bar_of(40.0, five * 0.15);

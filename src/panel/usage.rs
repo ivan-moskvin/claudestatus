@@ -351,7 +351,8 @@ mod tests {
             expired: false,
         };
         assert_eq!(week(40.0, 2 * day).tint(SEVEN_DAY_SECONDS), Rgb::GREEN);
-        assert_eq!(week(40.0, 4 * day).tint(SEVEN_DAY_SECONDS), Rgb::ORANGE);
+        assert_eq!(week(40.0, 4 * day).tint(SEVEN_DAY_SECONDS), Rgb::GREEN);
+        assert_eq!(week(50.0, 4 * day).tint(SEVEN_DAY_SECONDS), Rgb::ORANGE);
         assert_eq!(week(40.0, 6 * day).tint(SEVEN_DAY_SECONDS), Rgb::RED);
         assert_eq!(
             week(70.0, 0).tint(SEVEN_DAY_SECONDS),
@@ -372,7 +373,7 @@ mod tests {
         };
         assert_eq!(five(70.0, 60 * minute).tint(FIVE_HOUR_SECONDS), Rgb::GREEN);
         assert_eq!(
-            five(50.0, 150 * minute).tint(FIVE_HOUR_SECONDS),
+            five(60.0, 150 * minute).tint(FIVE_HOUR_SECONDS),
             Rgb::ORANGE
         );
         assert_eq!(five(40.0, 255 * minute).tint(FIVE_HOUR_SECONDS), Rgb::RED);
