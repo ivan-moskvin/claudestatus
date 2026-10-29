@@ -222,7 +222,7 @@ fn verify_tree(dir: &Path, artifact: &Artifact) -> Outcome {
                     .map_err(|e| e.to_string())?
                     .to_str()
                     .ok_or("Invalid path")?
-                    .to_owned();
+                    .replace(std::path::MAIN_SEPARATOR, "/");
                 if relative != MANIFEST_NAME {
                     seen.insert(relative);
                 }
