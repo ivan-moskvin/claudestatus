@@ -288,7 +288,10 @@ pub fn install() -> Outcome {
     let stage = (0..1000)
         .find_map(|n| {
             let path = parent.join(format!(".stage-{}-{n}", std::process::id()));
+            #[cfg(unix)]
             let mut builder = fs::DirBuilder::new();
+            #[cfg(not(unix))]
+            let builder = fs::DirBuilder::new();
             #[cfg(unix)]
             {
                 use std::os::unix::fs::DirBuilderExt;

@@ -1,7 +1,11 @@
 //! Reversible launcher for interactive Codex sessions.
 
-use std::fs::{self, OpenOptions};
-use std::io::{Read, Write};
+use std::fs;
+#[cfg(unix)]
+use std::fs::OpenOptions;
+use std::io::Read;
+#[cfg(unix)]
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use crate::Outcome;
