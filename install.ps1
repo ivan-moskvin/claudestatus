@@ -1,17 +1,17 @@
-# Installs claudestatus from the latest release. After that the utility looks
-# after itself: claudestatus update to update, claudestatus uninstall to remove.
+# Installs clistatus from the latest release. After that the utility looks
+# after itself: clistatus update to update, clistatus uninstall to remove.
 #
-#   irm https://raw.githubusercontent.com/ivan-moskvin/claudestatus/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/ivan-moskvin/clistatus/main/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
-$repo = "ivan-moskvin/claudestatus"
-$binDir = if ($env:CLAUDESTATUS_BIN_DIR) { $env:CLAUDESTATUS_BIN_DIR } else { Join-Path $env:LOCALAPPDATA "claudestatus" }
+$repo = "ivan-moskvin/clistatus"
+$binDir = if ($env:CLISTATUS_BIN_DIR) { $env:CLISTATUS_BIN_DIR } else { Join-Path $env:LOCALAPPDATA "clistatus" }
 
 # The messages follow the interface language of the system, the same way the
-# binary picks it: CLAUDESTATUS_LANG wins, then the culture Windows reports.
+# binary picks it: CLISTATUS_LANG wins, then the culture Windows reports.
 # Every language is one branch here — nothing below chooses wording again.
-$lang = if ($env:CLAUDESTATUS_LANG) { $env:CLAUDESTATUS_LANG } else { [System.Globalization.CultureInfo]::CurrentUICulture.TwoLetterISOLanguageName }
+$lang = if ($env:CLISTATUS_LANG) { $env:CLISTATUS_LANG } else { [System.Globalization.CultureInfo]::CurrentUICulture.TwoLetterISOLanguageName }
 $m = if ($lang -like "ru*") {
     @{
         UnknownArch  = "Неизвестная архитектура: {0} — соберите из исходников."
@@ -38,14 +38,14 @@ $arch = switch ($env:PROCESSOR_ARCHITECTURE) {
     default { throw ($m.UnknownArch -f $env:PROCESSOR_ARCHITECTURE) }
 }
 
-$asset = "claudestatus_windows_$arch.exe"
+$asset = "clistatus_windows_$arch.exe"
 $base = "https://github.com/$repo/releases/latest/download"
 $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName())
 New-Item -ItemType Directory -Path $tmp | Out-Null
 
 try {
     Write-Host ($m.Downloading -f $asset)
-    Invoke-WebRequest -Uri "$base/$asset" -OutFile "$tmp\claudestatus.exe"
+    Invoke-WebRequest -Uri "$base/$asset" -OutFile "$tmp\clistatus.exe"
     Invoke-WebRequest -Uri "$base/checksums.txt" -OutFile "$tmp\checksums.txt"
 
     $want = (Get-Content "$tmp\checksums.txt" |
@@ -53,14 +53,14 @@ try {
         ForEach-Object { ($_ -split '\s+')[0] })
     if (-not $want) { throw ($m.NoChecksum -f $asset) }
 
-    $got = (Get-FileHash "$tmp\claudestatus.exe" -Algorithm SHA256).Hash
+    $got = (Get-FileHash "$tmp\clistatus.exe" -Algorithm SHA256).Hash
     if ($got -ne $want.ToUpper()) { throw $m.BadChecksum }
 
     New-Item -ItemType Directory -Force -Path $binDir | Out-Null
-    Move-Item -Force "$tmp\claudestatus.exe" (Join-Path $binDir "claudestatus.exe")
-    Write-Host ($m.Installed -f (Join-Path $binDir "claudestatus.exe"))
+    Move-Item -Force "$tmp\clistatus.exe" (Join-Path $binDir "clistatus.exe")
+    Write-Host ($m.Installed -f (Join-Path $binDir "clistatus.exe"))
 
-    # The directory goes into the user PATH — otherwise the claudestatus command
+    # The directory goes into the user PATH — otherwise the clistatus command
     # will not be found.
     $current = [Environment]::GetEnvironmentVariable("Path", "User")
     $entries = @()
@@ -77,7 +77,7 @@ try {
         $env:Path = "$env:Path;$binDir"
     }
 
-    & (Join-Path $binDir "claudestatus.exe") install
+    & (Join-Path $binDir "clistatus.exe") install
 }
 finally {
     Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue

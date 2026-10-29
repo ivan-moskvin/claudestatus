@@ -154,7 +154,7 @@ fn platforms(root: &Path) -> Result<Vec<String>, String> {
 
     let mut found: Vec<String> = Vec::new();
     for line in workflow.lines() {
-        let Some(asset) = line.trim().strip_prefix("asset: claudestatus_") else {
+        let Some(asset) = line.trim().strip_prefix("asset: clistatus_") else {
             continue;
         };
         let system = match asset.split('_').next() {

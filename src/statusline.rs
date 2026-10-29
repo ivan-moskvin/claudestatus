@@ -101,6 +101,239 @@ pub fn run(update_mark: Option<String>) {
     println!("{}", compose(&session, &limits, update_mark, now()));
 }
 
+/// Renders the external Codex status-line payload without saving Claude limits.
+pub fn run_codex(update_mark: Option<String>) {
+    let mut input = String::new();
+    if std::io::stdin()
+        .take(16_385)
+        .read_to_string(&mut input)
+        .is_err()
+        || input.len() > 16_384
+    {
+        println!("—");
+        return;
+    }
+    let now = now();
+    let line = compose_codex(&input, update_mark, now);
+    let agents = serde_json::from_str::<Value>(&input)
+        .ok()
+        .and_then(|payload| {
+            payload
+                .pointer("/session/id")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        })
+        .map(|session| crate::codex_agents::active(&session))
+        .unwrap_or_default();
+    println!("{}", with_agents(line, &agents, now));
+}
+
+fn agent_line(agent: &crate::codex_agents::Agent) -> String {
+    let model = agent.model.as_deref().unwrap_or("?");
+    let model = model
+        .strip_prefix("gpt-")
+        .map(|name| {
+            let title = name
+                .split('-')
+                .map(|part| {
+                    let mut chars = part.chars();
+                    format!(
+                        "{}{}",
+                        chars
+                            .next()
+                            .map(|c| c.to_ascii_uppercase())
+                            .unwrap_or_default(),
+                        chars.as_str()
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("-");
+            format!("GPT-{title}")
+        })
+        .unwrap_or_else(|| model.to_owned());
+    let model = match agent
+        .effort
+        .as_deref()
+        .and_then(|level| EFFORT.iter().find(|(candidate, _, _)| *candidate == level))
+    {
+        Some((_, mark, color)) => colorized(&format!("{model} {mark}"), *color),
+        None => model,
+    };
+    let prefix = format!("{}({model}): ", shortened(&agent.name, 28));
+    let task = agent
+        .task
+        .as_deref()
+        .unwrap_or("—")
+        .trim_start_matches("Задача: ");
+    format!(
+        "{prefix}{}",
+        shortened(task, terminal_columns().saturating_sub(width(&prefix) + 4))
+    )
+}
+
+fn shortened(text: &str, limit: usize) -> String {
+    if text.chars().count() <= limit {
+        return text.to_owned();
+    }
+    if limit == 0 {
+        return String::new();
+    }
+    format!("{}…", text.chars().take(limit - 1).collect::<String>())
+}
+
+fn terminal_columns() -> usize {
+    #[cfg(unix)]
+    {
+        use std::os::fd::AsRawFd;
+        if let Ok(tty) = std::fs::File::open("/dev/tty") {
+            let mut size: libc::winsize = unsafe { std::mem::zeroed() };
+            if unsafe { libc::ioctl(tty.as_raw_fd(), libc::TIOCGWINSZ, &mut size) } == 0
+                && size.ws_col > 0
+            {
+                return usize::from(size.ws_col);
+            }
+        }
+    }
+    std::env::var("COLUMNS")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|columns| *columns >= 20)
+        .unwrap_or(100)
+}
+
+fn with_agents(line: String, agents: &[crate::codex_agents::Agent], _now: f64) -> String {
+    if agents.is_empty() {
+        return line;
+    }
+    let mut rows: Vec<String> = line.lines().map(str::to_owned).collect();
+    for agent in agents.iter().take(3) {
+        rows.push(agent_line(agent));
+    }
+    if agents.len() > 3 {
+        rows.push("more...".into());
+    }
+    rows.join("\n")
+}
+
+fn compose_codex(input: &str, update_mark: Option<String>, now: f64) -> String {
+    let Ok(payload) = serde_json::from_str::<Value>(input) else {
+        return "—".into();
+    };
+    if payload.get("payload_version").and_then(Value::as_u64) != Some(1) {
+        return "—".into();
+    }
+
+    let mut session = serde_json::json!({});
+    if let Some(name) = payload.pointer("/model/name").and_then(Value::as_str) {
+        let name: String = name.chars().filter(|c| !c.is_control()).take(128).collect();
+        session["model"]["display_name"] = name.into();
+    }
+    if let Some(level) = payload.pointer("/model/reasoning").and_then(Value::as_str) {
+        session["effort"]["level"] = level.into();
+    }
+    let fraction = |value: &Value| {
+        value
+            .as_f64()
+            .filter(|n| n.is_finite())
+            .map(|n| n.clamp(0.0, 1.0))
+    };
+    if let Some(used) = payload
+        .pointer("/usage/context_used")
+        .and_then(fraction)
+        .or_else(|| {
+            payload
+                .pointer("/usage/context_remaining")
+                .and_then(fraction)
+                .map(|n| 1.0 - n)
+        })
+    {
+        session["context_window"]["used_percentage"] = (used * 100.0).into();
+    }
+    if let Some(window) = payload
+        .pointer("/usage/context_window")
+        .and_then(Value::as_f64)
+        .filter(|n| n.is_finite() && *n > 0.0)
+    {
+        session["context_window"]["context_window_size"] = window.into();
+    }
+    let mut limits = Map::new();
+    for (source, target) in [("five_hour", "five_hour"), ("weekly", "seven_day")] {
+        if let Some(window) = payload
+            .pointer(&format!("/usage/{source}"))
+            .and_then(Value::as_object)
+        {
+            let mut normalized = Map::new();
+            if let Some(used) = window.get("used").and_then(fraction) {
+                normalized.insert("used_percentage".into(), (used * 100.0).into());
+            }
+            if let Some(reset) = window
+                .get("resets_at")
+                .and_then(Value::as_str)
+                .and_then(codex_timestamp)
+            {
+                normalized.insert("resets_at".into(), reset.into());
+            }
+            limits.insert(target.into(), normalized.into());
+        }
+    }
+    compose(&session, &limits, update_mark, now)
+}
+
+fn codex_timestamp(stamp: &str) -> Option<f64> {
+    let bytes = stamp.as_bytes();
+    if bytes.len() != 20
+        || bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || bytes[10] != b'T'
+        || bytes[13] != b':'
+        || bytes[16] != b':'
+        || bytes[19] != b'Z'
+        || !bytes
+            .iter()
+            .enumerate()
+            .all(|(i, c)| [4, 7, 10, 13, 16, 19].contains(&i) || c.is_ascii_digit())
+    {
+        return None;
+    }
+    let year: i64 = stamp[0..4].parse().ok()?;
+    let month: i64 = stamp[5..7].parse().ok()?;
+    let day: i64 = stamp[8..10].parse().ok()?;
+    let hour: i64 = stamp[11..13].parse().ok()?;
+    let minute: i64 = stamp[14..16].parse().ok()?;
+    let second: i64 = stamp[17..19].parse().ok()?;
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days = [
+        31,
+        if leap { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
+    if !(1..=12).contains(&month)
+        || day < 1
+        || day > days[(month - 1) as usize]
+        || hour > 23
+        || minute > 59
+        || second > 59
+    {
+        return None;
+    }
+    let year = year - i64::from(month <= 2);
+    let era = year.div_euclid(400);
+    let yoe = year - era * 400;
+    let shifted = if month > 2 { month - 3 } else { month + 9 };
+    let doy = (153 * shifted + 2) / 5 + day - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    Some(((era * 146_097 + doe - 719_468) * 86_400 + hour * 3600 + minute * 60 + second) as f64)
+}
+
 /// Puts the line together. Takes the moment as an argument so that a test can
 /// say when it is.
 fn compose(
@@ -224,7 +457,9 @@ fn compose(
 /// leaving a week that always looks over. How wide the whole window is can be
 /// read off the bar above.
 fn week_strip(elapsed: f64) -> String {
-    format!("\x1b[0;38;5;{STRIP}m{}\x1b[0m", "‾".repeat(cells(elapsed)))
+    let count = cells(elapsed).max(usize::from(elapsed > 0.0));
+    let mark = "‾".repeat(count);
+    format!("\x1b[0;38;5;{STRIP}m{mark}\x1b[0m")
 }
 
 /// The width of a drawn part on screen: what is left once the colors are gone.
@@ -408,6 +643,86 @@ fn now() -> f64 {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn active_agents_use_the_requested_name_model_effort_task_format() {
+        let agent = crate::codex_agents::Agent {
+            id: "child".into(),
+            name: "review".into(),
+            model: Some("gpt-6.1-sol".into()),
+            effort: Some("medium".into()),
+            task: Some("проверка тестов".into()),
+        };
+        let line = agent_line(&agent);
+        assert_eq!(plain(&line), "review(GPT-6.1-Sol ◔): проверка тестов");
+        assert!(line.contains("38;5;111"));
+        let agents = vec![agent.clone(), agent.clone(), agent];
+        let rendered = with_agents("bars\nweekly strip".into(), &agents, 0.0);
+        assert_eq!(rendered.lines().count(), 5);
+        assert!(rendered.starts_with("bars\nweekly strip\nreview("));
+        assert!(!rendered.contains("more..."));
+        let mut four = agents.clone();
+        four.push(four[0].clone());
+        let rendered = with_agents("bars\nweekly strip".into(), &four, 0.0);
+        assert_eq!(rendered.lines().count(), 6);
+        assert_eq!(rendered.lines().last(), Some("more..."));
+        assert_eq!(with_agents("bars\nstrip".into(), &[], 0.0), "bars\nstrip");
+    }
+
+    #[test]
+    fn renders_codex_payload_with_real_bars_and_reset_strip() {
+        let input = json!({"payload_version": 1, "model": {"name": "gpt-6.1-sol", "reasoning": "medium"},
+            "usage": {"context_used": 0.25, "context_remaining": 0.75, "context_tokens": 100000,
+                "context_window": 400000, "five_hour": {"used": 0.3, "resets_at": "2026-10-29T12:00:00Z"},
+                "weekly": {"used": 0.5, "resets_at": "2026-11-04T12:00:00Z"}}}).to_string();
+        let now = codex_timestamp("2026-10-29T10:00:00Z").unwrap();
+        let line = compose_codex(&input, None, now);
+        let visible = plain(&line);
+        assert!(line.contains("\x1b[1;48;5;"));
+        for expected in ["gpt-6.1-sol ◔", "25%", "30%", "50%", "2h 00m", "‾"] {
+            assert!(visible.contains(expected), "{expected}: {visible}");
+        }
+        assert_eq!(visible.matches("ctx").count(), 1);
+        assert_eq!(line.lines().count(), 2);
+    }
+
+    #[test]
+    fn codex_missing_and_invalid_fields_do_not_invent_values() {
+        assert_eq!(compose_codex("{}", None, 0.0), "—");
+        assert_eq!(compose_codex("{", None, 0.0), "—");
+        let line = compose_codex(
+            &json!({"payload_version": 1, "model": {"name": "test"},
+            "usage": {"five_hour": {"used": 1.5, "resets_at": "2026-02-30T00:00:00Z"}}})
+            .to_string(),
+            None,
+            0.0,
+        );
+        let visible = plain(&line);
+        assert!(visible.contains("100%"));
+        assert!(!visible.contains("ctx"));
+        assert!(!visible.contains("reset"));
+        assert!(!visible.contains("7d"));
+        assert_eq!(codex_timestamp("1970-01-01T00:00:00Z"), Some(0.0));
+    }
+
+    #[test]
+    fn codex_weekly_only_omits_missing_five_hour() {
+        let input = json!({"payload_version":1,"usage":{"weekly":{"used":0.05}}}).to_string();
+        let visible = plain(&compose_codex(&input, None, 0.0));
+        assert!(!visible.contains("5h"), "{visible}");
+        assert!(!visible.contains("reset"), "{visible}");
+        assert!(
+            visible.contains("7d") && visible.contains("5%"),
+            "{visible}"
+        );
+    }
+
+    #[test]
+    fn subcell_week_progress_stays_visible_without_numeric_label() {
+        let visible = plain(&week_strip(0.6));
+        assert_eq!(visible, "‾");
+        assert_eq!(plain(&week_strip(50.0)), "‾‾‾‾‾");
+    }
 
     /// The line with the escape sequences taken out — what the eye sees.
     fn plain(line: &str) -> String {

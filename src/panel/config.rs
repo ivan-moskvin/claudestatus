@@ -91,7 +91,7 @@ impl std::fmt::Display for Missing {
             Missing::NeverTurnedOn => write!(
                 f,
                 "{}",
-                t("the panel is not turned on — claudestatus divoom on")
+                t("the panel is not turned on — clistatus divoom on")
             ),
             Missing::Broken(what) => write!(f, "{what}"),
         }

@@ -210,7 +210,7 @@ fn settings_path() -> Result<PathBuf, String> {
 }
 
 /// Claude Code calls the binary by its absolute path and does fine without
-/// PATH, but the user types `claudestatus` by hand.
+/// PATH, but the user types `clistatus` by hand.
 fn warn_if_not_in_path(exe: &Path) {
     let Some(dir) = exe.parent() else { return };
     let path = std::env::var_os("PATH").unwrap_or_default();
@@ -221,7 +221,7 @@ fn warn_if_not_in_path(exe: &Path) {
     println!(
         "{}",
         tf!(
-            "\n{0} is not in PATH — the claudestatus command will not be found.",
+            "\n{0} is not in PATH — the clistatus command will not be found.",
             dir.display()
         )
     );
@@ -272,10 +272,8 @@ mod tests {
 
     impl Scratch {
         fn new(name: &str) -> Self {
-            let dir = std::env::temp_dir().join(format!(
-                "claudestatus-settings-{name}-{}",
-                std::process::id()
-            ));
+            let dir = std::env::temp_dir()
+                .join(format!("clistatus-settings-{name}-{}", std::process::id()));
             let _ = std::fs::remove_dir_all(&dir);
             std::fs::create_dir_all(&dir).unwrap();
             Self(dir)
@@ -306,7 +304,7 @@ mod tests {
     fn writes_the_status_line_into_settings_that_were_not_there() {
         let scratch = Scratch::new("fresh");
         let path = scratch.settings();
-        let exe = Path::new("/usr/local/bin/claudestatus");
+        let exe = Path::new("/usr/local/bin/clistatus");
 
         assert_eq!(write_settings(&path, exe).unwrap(), Some(None));
 
@@ -314,7 +312,7 @@ mod tests {
         assert_eq!(settings["statusLine"]["type"], "command");
         assert_eq!(
             settings["statusLine"]["command"],
-            "\"/usr/local/bin/claudestatus\""
+            "\"/usr/local/bin/clistatus\""
         );
     }
 
@@ -323,7 +321,7 @@ mod tests {
         let scratch = Scratch::new("keeps");
         let path = scratch.write(r#"{"theme":"dark","permissions":{"allow":["Bash"]}}"#);
 
-        write_settings(&path, Path::new("/bin/claudestatus")).unwrap();
+        write_settings(&path, Path::new("/bin/clistatus")).unwrap();
 
         let settings = read(&path);
         assert_eq!(settings["theme"], "dark");
@@ -336,7 +334,7 @@ mod tests {
         let scratch = Scratch::new("backup");
         let path = scratch.write(r#"{"theme":"dark"}"#);
 
-        write_settings(&path, Path::new("/bin/claudestatus")).unwrap();
+        write_settings(&path, Path::new("/bin/clistatus")).unwrap();
 
         let backup = std::fs::read_to_string(with_suffix(&path, ".bak")).unwrap();
         assert_eq!(backup, r#"{"theme":"dark"}"#);
@@ -348,7 +346,7 @@ mod tests {
         let path =
             scratch.write(r#"{"statusLine":{"type":"command","command":"starship prompt"}}"#);
 
-        let replaced = write_settings(&path, Path::new("/bin/claudestatus")).unwrap();
+        let replaced = write_settings(&path, Path::new("/bin/clistatus")).unwrap();
 
         assert_eq!(replaced, Some(Some("starship prompt".to_string())));
     }
@@ -356,7 +354,7 @@ mod tests {
     #[test]
     fn says_nothing_about_replacing_itself() {
         let scratch = Scratch::new("again");
-        let exe = Path::new("/bin/claudestatus");
+        let exe = Path::new("/bin/clistatus");
         let path = scratch.settings();
 
         write_settings(&path, exe).unwrap();
@@ -368,7 +366,7 @@ mod tests {
         let scratch = Scratch::new("broken");
         let path = scratch.write("{ this is not json");
 
-        let err = write_settings(&path, Path::new("/bin/claudestatus")).unwrap_err();
+        let err = write_settings(&path, Path::new("/bin/clistatus")).unwrap_err();
 
         assert!(err.contains("settings.json"), "{err}");
         // Nothing was written over what we could not understand.
@@ -383,7 +381,7 @@ mod tests {
         let scratch = Scratch::new("empty");
         let path = scratch.write("   \n");
 
-        write_settings(&path, Path::new("/bin/claudestatus")).unwrap();
+        write_settings(&path, Path::new("/bin/clistatus")).unwrap();
 
         assert!(read(&path)["statusLine"].is_object());
     }
@@ -391,7 +389,7 @@ mod tests {
     #[test]
     fn takes_our_own_status_line_out() {
         let scratch = Scratch::new("remove");
-        let exe = Path::new("/bin/claudestatus");
+        let exe = Path::new("/bin/clistatus");
         let path = scratch.settings();
         write_settings(&path, exe).unwrap();
 
@@ -405,7 +403,7 @@ mod tests {
         let path =
             scratch.write(r#"{"statusLine":{"type":"command","command":"starship prompt"}}"#);
 
-        let removal = remove_from_settings(&path, Path::new("/bin/claudestatus")).unwrap();
+        let removal = remove_from_settings(&path, Path::new("/bin/clistatus")).unwrap();
 
         assert_eq!(removal, Removal::SomebodyElses("starship prompt".into()));
         assert_eq!(read(&path)["statusLine"]["command"], "starship prompt");
@@ -415,7 +413,7 @@ mod tests {
     fn has_nothing_to_remove_from_settings_that_are_not_there() {
         let scratch = Scratch::new("nosettings");
         let removal =
-            remove_from_settings(&scratch.settings(), Path::new("/bin/claudestatus")).unwrap();
+            remove_from_settings(&scratch.settings(), Path::new("/bin/clistatus")).unwrap();
         assert_eq!(removal, Removal::NoSettings);
     }
 
@@ -434,8 +432,8 @@ mod tests {
     #[test]
     fn quotes_a_path_with_spaces_in_it() {
         assert_eq!(
-            quoted(Path::new("/Users/me/my tools/claudestatus")),
-            "\"/Users/me/my tools/claudestatus\""
+            quoted(Path::new("/Users/me/my tools/clistatus")),
+            "\"/Users/me/my tools/clistatus\""
         );
     }
 }

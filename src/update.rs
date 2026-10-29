@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 use crate::i18n::tf;
 use crate::{Outcome, paths, version};
 
-const REPOSITORY: &str = "ivan-moskvin/claudestatus";
+const REPOSITORY: &str = "ivan-moskvin/clistatus";
 
 /// The first call checks right away — there is no cache yet — and after that no
 /// more than once an hour.
@@ -68,7 +68,7 @@ pub fn check(quiet: bool) -> Outcome {
         println!(
             "{}",
             tf!(
-                "{0} installed, {1} is out — update with: claudestatus update",
+                "{0} installed, {1} is out — update with: clistatus update",
                 installed,
                 latest
             )
@@ -131,7 +131,9 @@ pub fn available() -> Option<String> {
 /// Waiting for it is not allowed: the status line is drawn on every keystroke
 /// and has to return at once.
 pub fn auto_check() {
-    if std::env::var_os("CLAUDESTATUS_NO_AUTO_UPDATE").is_some() {
+    if std::env::var_os("CLISTATUS_NO_AUTO_UPDATE").is_some()
+        || std::env::var_os("CLAUDESTATUS_NO_AUTO_UPDATE").is_some()
+    {
         return;
     }
     if let Some(cache) = read_cache()
@@ -229,7 +231,7 @@ fn with_suffix(exe: &Path, suffix: &str) -> PathBuf {
 /// them that way — the platform is named as Go named it, whatever this compiler
 /// calls it.
 fn asset_name() -> String {
-    let name = format!("claudestatus_{}", platform().replace('/', "_"));
+    let name = format!("clistatus_{}", platform().replace('/', "_"));
     if cfg!(windows) {
         format!("{name}.exe")
     } else {
@@ -281,7 +283,7 @@ fn latest_version(source: &Source) -> Result<String, String> {
 fn fetch(url: &str, timeout: Duration) -> Result<Vec<u8>, String> {
     let mut response = ureq::get(url)
         .header("Accept", "application/vnd.github+json")
-        .header("User-Agent", "claudestatus")
+        .header("User-Agent", "clistatus")
         .config()
         .timeout_global(Some(timeout))
         .http_status_as_error(false)
@@ -442,10 +444,10 @@ mod tests {
 
     /// A file standing in for the running binary, in a directory of its own.
     fn staged_binary(name: &str, content: &[u8]) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("claudestatus-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("clistatus-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        let exe = dir.join("claudestatus");
+        let exe = dir.join("clistatus");
         std::fs::write(&exe, content).unwrap();
         exe
     }
@@ -509,7 +511,7 @@ mod tests {
     fn refuses_a_release_that_has_no_binary_for_us() {
         let releases = Releases::serving(vec![(
             "checksums.txt".into(),
-            b"aaa  claudestatus_plan9_arm64\n".to_vec(),
+            b"aaa  clistatus_plan9_arm64\n".to_vec(),
         )]);
 
         let exe = staged_binary("missing", b"the old binary");
@@ -555,28 +557,28 @@ mod tests {
 
     #[test]
     fn finds_the_checksum_of_our_asset() {
-        let sums = "aaa  claudestatus_linux_amd64\nbbb  claudestatus_darwin_arm64\nccc *claudestatus_windows_amd64.exe\n";
+        let sums = "aaa  clistatus_linux_amd64\nbbb  clistatus_darwin_arm64\nccc *clistatus_windows_amd64.exe\n";
         assert_eq!(
-            checksum_for(sums, "claudestatus_darwin_arm64").as_deref(),
+            checksum_for(sums, "clistatus_darwin_arm64").as_deref(),
             Some("bbb")
         );
         // The sha256sum format marks a binary file with a star.
         assert_eq!(
-            checksum_for(sums, "claudestatus_windows_amd64.exe").as_deref(),
+            checksum_for(sums, "clistatus_windows_amd64.exe").as_deref(),
             Some("ccc")
         );
-        assert_eq!(checksum_for(sums, "claudestatus_plan9_arm64"), None);
+        assert_eq!(checksum_for(sums, "clistatus_plan9_arm64"), None);
     }
 
     #[test]
     fn does_not_mistake_one_asset_for_another() {
-        let sums = "aaa  claudestatus_linux_amd64\nbbb  claudestatus_linux_amd64.exe\n";
+        let sums = "aaa  clistatus_linux_amd64\nbbb  clistatus_linux_amd64.exe\n";
         assert_eq!(
-            checksum_for(sums, "claudestatus_linux_amd64").as_deref(),
+            checksum_for(sums, "clistatus_linux_amd64").as_deref(),
             Some("aaa")
         );
         assert_eq!(
-            checksum_for(sums, "claudestatus_linux_amd64.exe").as_deref(),
+            checksum_for(sums, "clistatus_linux_amd64.exe").as_deref(),
             Some("bbb")
         );
     }
@@ -584,14 +586,14 @@ mod tests {
     #[test]
     fn names_the_asset_the_way_the_release_does() {
         let name = asset_name();
-        assert!(name.starts_with("claudestatus_"), "{name}");
+        assert!(name.starts_with("clistatus_"), "{name}");
         // The names of the release are the ones the Go build produced.
         assert!(
             !name.contains("macos") && !name.contains("x86_64") && !name.contains("aarch64"),
             "{name}"
         );
         if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
-            assert_eq!(name, "claudestatus_darwin_arm64");
+            assert_eq!(name, "clistatus_darwin_arm64");
         }
     }
 }

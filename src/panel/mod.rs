@@ -22,15 +22,15 @@ use config::{Config, Missing};
 
 pub use daemon::{ensure_running, stop};
 
-const USAGE: &str = "claudestatus divoom — limits panel on the screen of a Divoom Times Gate.
+const USAGE: &str = "clistatus divoom — limits panel on the screen of a Divoom Times Gate.
 
 Usage:
-  claudestatus divoom on [N]       find the Divoom devices and turn the panel on device N
-  claudestatus divoom off          turn the panel off and give the screen its clock face back
-  claudestatus divoom              keep the panel updated (works while running)
-  claudestatus divoom once         send the panel once and exit
-  claudestatus divoom screen [N]   show or take over screen 1–5
-  claudestatus divoom preview FILE save a frame to a file without touching the device
+  clistatus divoom on [N]       find the Divoom devices and turn the panel on device N
+  clistatus divoom off          turn the panel off and give the screen its clock face back
+  clistatus divoom              keep the panel updated (works while running)
+  clistatus divoom once         send the panel once and exit
+  clistatus divoom screen [N]   show or take over screen 1–5
+  clistatus divoom preview FILE save a frame to a file without touching the device
 
 The settings are divoom.json in the application directory, created by on.
 ";
@@ -52,7 +52,7 @@ pub fn run(args: &[String]) -> Outcome {
         Some("screen") => screen(&args[1..]),
         Some("preview") => {
             let Some(file) = args.get(1) else {
-                return Err(t("name a file: claudestatus divoom preview panel.gif").into());
+                return Err(t("name a file: clistatus divoom preview panel.gif").into());
             };
             let frame = render::draw(&usage::read())?;
             std::fs::write(file, frame.bytes())
@@ -176,7 +176,7 @@ fn locate(config: &mut Config) -> Result<Device, String> {
     let picked = pick_known(&found, config)
         .or_else(|| found.first().filter(|_| found.len() == 1).cloned())
         .ok_or_else(|| {
-            t("the chosen device is not on the network — choose again: claudestatus divoom on")
+            t("the chosen device is not on the network — choose again: clistatus divoom on")
                 .to_string()
         })?;
 
@@ -300,7 +300,7 @@ fn choose(found: &[Device], config: &Config, args: &[String]) -> Result<Device, 
     list(found);
     if !std::io::IsTerminal::is_terminal(&std::io::stdin()) {
         return Err(
-            t("there is more than one device — name the number: claudestatus divoom on N").into(),
+            t("there is more than one device — name the number: clistatus divoom on N").into(),
         );
     }
 

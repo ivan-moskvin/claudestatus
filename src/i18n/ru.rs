@@ -8,37 +8,43 @@
 pub const CATALOG: &[(&str, &str)] = &[
     // help and arguments
     (
-        "claudestatus — Claude limits in the Claude Code status line.
+        "clistatus — Claude and Codex limits in your terminal.
 
 Usage:
-  claudestatus            status line: session JSON on stdin, line on stdout
-  claudestatus install    register in ~/.claude/settings.json
-  claudestatus check      check whether a new version is out
-  claudestatus update     download the latest version and replace itself
-  claudestatus uninstall  remove the status line, the cache and the binary
-  claudestatus divoom     limits panel on a Divoom Times Gate (divoom help)
-  claudestatus version    print the version
-  claudestatus help       this help
+  clistatus            status line: session JSON on stdin, line on stdout
+  clistatus install    register in ~/.claude/settings.json
+  clistatus install codex  install the Codex footer bridge for our renderer
+  clistatus codex [ARGS]   launch Codex with our colored status line
+  clistatus render codex   render Codex session JSON from stdin
+  clistatus check      check whether a new version is out
+  clistatus update     download the latest version and replace itself
+  clistatus uninstall  remove the status line, the cache and the binary
+  clistatus divoom     limits panel on a Divoom Times Gate (divoom help)
+  clistatus version    print the version
+  clistatus help       this help
 
 Environment:
-  CLAUDESTATUS_LANG=ru|en         force the interface language
-  CLAUDESTATUS_NO_AUTO_UPDATE=1   do not check for updates in the background
+  CLISTATUS_LANG=ru|en         force the interface language
+  CLISTATUS_NO_AUTO_UPDATE=1   do not check for updates in the background
 ",
-        "claudestatus — лимиты Claude в строке статуса Claude Code.
+        "clistatus — лимиты Claude и Codex в терминале.
 
 Использование:
-  claudestatus            строка статуса: JSON сессии на stdin, строка на stdout
-  claudestatus install    прописать себя в ~/.claude/settings.json
-  claudestatus check      проверить, вышла ли новая версия
-  claudestatus update     скачать последнюю версию и заменить себя ею
-  claudestatus uninstall  убрать строку статуса, кэш и сам бинарь
-  claudestatus divoom     панель лимитов на Divoom Times Gate (divoom help)
-  claudestatus version    показать версию
-  claudestatus help       эта справка
+  clistatus            строка статуса: JSON сессии на stdin, строка на stdout
+  clistatus install    прописать себя в ~/.claude/settings.json
+  clistatus install codex  установить подключение нашего рендера к Codex
+  clistatus codex [ARGS]   запустить Codex с нашими цветными полосками
+  clistatus render codex   отрисовать JSON сессии Codex из stdin
+  clistatus check      проверить, вышла ли новая версия
+  clistatus update     скачать последнюю версию и заменить себя ею
+  clistatus uninstall  убрать строку статуса, кэш и сам бинарь
+  clistatus divoom     панель лимитов на Divoom Times Gate (divoom help)
+  clistatus version    показать версию
+  clistatus help       эта справка
 
 Переменные окружения:
-  CLAUDESTATUS_LANG=ru|en         задать язык интерфейса
-  CLAUDESTATUS_NO_AUTO_UPDATE=1   не проверять обновления в фоне
+  CLISTATUS_LANG=ru|en         задать язык интерфейса
+  CLISTATUS_NO_AUTO_UPDATE=1   не проверять обновления в фоне
 ",
     ),
     (
@@ -50,6 +56,63 @@ Environment:
     ("reset", "сброс"),
     ("{0}h {1}m", "{0}ч {1}м"),
     // install and uninstall
+    (
+        "Codex footer connected. Start a new session with: codex",
+        "Строка статуса подключена. Новые сессии запускай обычной командой: codex",
+    ),
+    (
+        "Original Codex launcher restored. The transport remains cached.",
+        "Прежний запускатель Codex восстановлен. Подключение к футеру осталось в кэше.",
+    ),
+    (
+        "Codex transport is installed. Run: clistatus codex",
+        "Подключение к футеру Codex установлено. Запуск: clistatus codex",
+    ),
+    (
+        "Downloading Codex footer transport ({0} MB)...",
+        "Скачиваю подключение к футеру Codex ({0} МБ)...",
+    ),
+    (
+        "Codex transport is unavailable: {0}",
+        "Подключение к футеру Codex недоступно: {0}",
+    ),
+    (
+        "Could not launch Codex: {0}",
+        "Не удалось запустить Codex: {0}",
+    ),
+    (
+        "Unsupported Codex platform: {0}/{1}",
+        "Нет сборки подключения к Codex для {0}/{1}",
+    ),
+    (
+        "could not migrate {0}: {1}",
+        "не удалось перенести {0}: {1}",
+    ),
+    (
+        "Usage: clistatus install [claude|codex]",
+        "Использование: clistatus install [claude|codex]",
+    ),
+    (
+        "Codex limit indicators enabled in {0}",
+        "Индикаторы лимитов Codex включены в {0}",
+    ),
+    (
+        "Codex limit indicators are already enabled in {0}",
+        "Индикаторы лимитов Codex уже включены в {0}",
+    ),
+    (
+        "Restart Codex CLI to apply. These are native Codex limits; custom Claude bars and Divoom snapshots are not available through this integration.",
+        "Перезапусти Codex CLI для применения. Это встроенные лимиты Codex; собственные полоски Claude и снимки для Divoom через эту интеграцию недоступны.",
+    ),
+    ("could not read {0}: {1}", "не удалось прочитать {0}: {1}"),
+    (
+        "could not back up {0}: {1}",
+        "не удалось сделать бэкап {0}: {1}",
+    ),
+    (
+        "{0}: tui must be a table and tui.status_line must be an array of strings",
+        "{0}: tui должен быть таблицей, а tui.status_line — массивом строк",
+    ),
     (
         "{0} does not parse — fix it by hand",
         "{0} не разбирается — поправьте его вручную",
@@ -76,8 +139,8 @@ Environment:
         "Строка статуса прописана в {0}",
     ),
     (
-        "\n{0} is not in PATH — the claudestatus command will not be found.",
-        "\nКаталог {0} не в PATH — команда claudestatus не найдётся.",
+        "\n{0} is not in PATH — the clistatus command will not be found.",
+        "\nКаталог {0} не в PATH — команда clistatus не найдётся.",
     ),
     (
         "Line for ~/.zshrc:  export PATH=\"{0}:$PATH\"",
@@ -113,8 +176,8 @@ Environment:
     ),
     // version check and update
     (
-        "{0} installed, {1} is out — update with: claudestatus update",
-        "Установлено {0}, вышло {1} — обновиться: claudestatus update",
+        "{0} installed, {1} is out — update with: clistatus update",
+        "Установлено {0}, вышло {1} — обновиться: clistatus update",
     ),
     (
         "Not a release build, the latest version is {0}",
@@ -168,34 +231,34 @@ Environment:
     ("{0} answered {1}", "{0} ответил {1}"),
     // divoom: help and arguments
     (
-        "claudestatus divoom — limits panel on the screen of a Divoom Times Gate.
+        "clistatus divoom — limits panel on the screen of a Divoom Times Gate.
 
 Usage:
-  claudestatus divoom on [N]       find the Divoom devices and turn the panel on device N
-  claudestatus divoom off          turn the panel off and give the screen its clock face back
-  claudestatus divoom              keep the panel updated (works while running)
-  claudestatus divoom once         send the panel once and exit
-  claudestatus divoom screen [N]   show or take over screen 1–5
-  claudestatus divoom preview FILE save a frame to a file without touching the device
+  clistatus divoom on [N]       find the Divoom devices and turn the panel on device N
+  clistatus divoom off          turn the panel off and give the screen its clock face back
+  clistatus divoom              keep the panel updated (works while running)
+  clistatus divoom once         send the panel once and exit
+  clistatus divoom screen [N]   show or take over screen 1–5
+  clistatus divoom preview FILE save a frame to a file without touching the device
 
 The settings are divoom.json in the application directory, created by on.
 ",
-        "claudestatus divoom — панель лимитов на экране Divoom Times Gate.
+        "clistatus divoom — панель лимитов на экране Divoom Times Gate.
 
 Использование:
-  claudestatus divoom on [N]       найти устройства Divoom и включить панель на устройстве N
-  claudestatus divoom off          выключить панель и вернуть экрану циферблат
-  claudestatus divoom              держать панель обновлённой (работает, пока запущен)
-  claudestatus divoom once         отправить панель один раз и выйти
-  claudestatus divoom screen [N]   показать или занять экран 1–5
-  claudestatus divoom preview FILE сохранить кадр в файл, не трогая устройство
+  clistatus divoom on [N]       найти устройства Divoom и включить панель на устройстве N
+  clistatus divoom off          выключить панель и вернуть экрану циферблат
+  clistatus divoom              держать панель обновлённой (работает, пока запущен)
+  clistatus divoom once         отправить панель один раз и выйти
+  clistatus divoom screen [N]   показать или занять экран 1–5
+  clistatus divoom preview FILE сохранить кадр в файл, не трогая устройство
 
 Настройки — divoom.json в каталоге приложения, создаёт on.
 ",
     ),
     (
-        "name a file: claudestatus divoom preview panel.gif",
-        "укажите файл: claudestatus divoom preview panel.gif",
+        "name a file: clistatus divoom preview panel.gif",
+        "укажите файл: clistatus divoom preview panel.gif",
     ),
     (
         "unknown command: {0}\n\n{1}",
@@ -217,12 +280,12 @@ The settings are divoom.json in the application directory, created by on.
         "устройство — число от 1 до {0}, а не {1}",
     ),
     (
-        "there is more than one device — name the number: claudestatus divoom on N",
-        "устройств больше одного — укажите номер: claudestatus divoom on N",
+        "there is more than one device — name the number: clistatus divoom on N",
+        "устройств больше одного — укажите номер: clistatus divoom on N",
     ),
     (
-        "the chosen device is not on the network — choose again: claudestatus divoom on",
-        "выбранного устройства нет в сети — выберите заново: claudestatus divoom on",
+        "the chosen device is not on the network — choose again: clistatus divoom on",
+        "выбранного устройства нет в сети — выберите заново: clistatus divoom on",
     ),
     (
         "the device did not take the frame",
@@ -237,8 +300,8 @@ The settings are divoom.json in the application directory, created by on.
         "устройство недоступно слишком долго, выхожу",
     ),
     (
-        "the panel is not turned on — claudestatus divoom on",
-        "панель не включена — claudestatus divoom on",
+        "the panel is not turned on — clistatus divoom on",
+        "панель не включена — clistatus divoom on",
     ),
     ("{0} does not parse: {1}", "{0} не разбирается: {1}"),
     (

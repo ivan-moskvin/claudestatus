@@ -1,15 +1,15 @@
 [package]
-name = "claudestatus"
+name = "clistatus"
 version = "2.4.1"
 edition = "2024"
 rust-version = "1.88"
-description = "Claude limits in the Claude Code status line"
-repository = "https://github.com/ivan-moskvin/claudestatus"
+description = "Claude and Codex limits in your terminal"
+repository = "https://github.com/ivan-moskvin/clistatus"
 license = "MIT"
 publish = false
 
 [[bin]]
-name = "claudestatus"
+name = "clistatus"
 path = "src/main.rs"
 
 [dependencies]
@@ -21,6 +21,9 @@ serde_json = { version = "1.0", features = ["preserve_order"] }
 ureq = { version = "3.3", features = ["json"] }
 sha2 = "0.11"
 dirs = "6.0"
+toml_edit = "0.23.10"
+tar = "0.4"
+flate2 = "1.1"
 
 [profile.release]
 strip = true

@@ -8,11 +8,11 @@ use std::path::{Path, PathBuf};
 
 use crate::i18n::tf;
 
-const APP: &str = "claudestatus";
+const APP: &str = "clistatus";
 
 /// The directory of our files, created if it is not there yet:
-/// macOS `~/Library/Application Support/claudestatus`, Windows
-/// `%AppData%\claudestatus`, Linux `~/.config/claudestatus`.
+/// macOS `~/Library/Application Support/clistatus`, Windows
+/// `%AppData%\clistatus`, Linux `~/.config/clistatus`.
 pub fn dir() -> Result<PathBuf, String> {
     let base = dirs::config_dir().ok_or_else(|| {
         tf!(
@@ -21,6 +21,7 @@ pub fn dir() -> Result<PathBuf, String> {
         )
     })?;
     let dir = base.join(APP);
+    migrate_dir(&base.join("claudestatus"), &dir)?;
     std::fs::create_dir_all(&dir)
         .map_err(|err| tf!("could not create {0}: {1}", dir.display(), err))?;
     Ok(dir)
@@ -41,7 +42,17 @@ pub fn cache_dir() -> Result<PathBuf, String> {
             "no cache directory"
         )
     })?;
-    Ok(base.join(APP))
+    let dir = base.join(APP);
+    migrate_dir(&base.join("claudestatus"), &dir)?;
+    Ok(dir)
+}
+
+fn migrate_dir(previous: &Path, current: &Path) -> Result<(), String> {
+    if previous.is_dir() && !current.exists() {
+        std::fs::rename(previous, current)
+            .map_err(|err| tf!("could not migrate {0}: {1}", previous.display(), err))?;
+    }
+    Ok(())
 }
 
 /// Files of earlier versions are moved out of `~/.claude`: settings must not
@@ -50,6 +61,12 @@ fn adopt_legacy(dir: &Path, home: Option<&Path>, name: &str) -> PathBuf {
     let path = dir.join(name);
     if path.exists() {
         return path;
+    }
+    if let Some(base) = dir.parent() {
+        let previous = base.join("claudestatus").join(name);
+        if previous.is_file() && std::fs::rename(&previous, &path).is_ok() {
+            return path;
+        }
     }
     if let Some(home) = home {
         let legacy = home.join(".claude").join(name);
@@ -69,8 +86,7 @@ mod tests {
 
     impl Scratch {
         fn new(name: &str) -> Self {
-            let dir =
-                std::env::temp_dir().join(format!("claudestatus-{name}-{}", std::process::id()));
+            let dir = std::env::temp_dir().join(format!("clistatus-{name}-{}", std::process::id()));
             let _ = std::fs::remove_dir_all(&dir);
             std::fs::create_dir_all(&dir).unwrap();
             Self(dir)

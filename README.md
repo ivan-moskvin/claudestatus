@@ -1,11 +1,11 @@
-# claudestatus
+# clistatus
 
 ![Tests](./.github/badges/tests.svg)
 ![Rust](./.github/badges/rust.svg)
 ![Platforms](./.github/badges/platforms.svg)
 ![Dependencies](./.github/badges/dependencies.svg)
 
-Claude limits in the Claude Code status line — visible while you work, without `/usage`.
+Claude and Codex limits in your terminal, rendered as colored usage bars.
 
 ![The status line in Claude Code](statusline.webp)
 
@@ -17,27 +17,38 @@ The Linux build is statically linked, so the distribution and its glibc do not m
 macOS and Linux:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ivan-moskvin/claudestatus/main/install.sh | sh
+cargo install --git https://github.com/ivan-moskvin/clistatus --locked --root "$HOME/.local"
+"$HOME/.local/bin/clistatus" install
 ```
 
 Windows (PowerShell):
 
 ```powershell
-irm https://raw.githubusercontent.com/ivan-moskvin/claudestatus/main/install.ps1 | iex
+cargo install --git https://github.com/ivan-moskvin/clistatus --locked
+clistatus install
 ```
+
+Source installation requires Rust 1.88 or newer. The release installers will
+be available after the first release with `clistatus` binaries.
+
+For the Codex footer on Apple Silicon macOS, run `clistatus install codex`,
+then start a new `codex` session and approve the agent hooks through `/hooks`.
 
 ## Update
 
 ```bash
-claudestatus update
+cargo install --git https://github.com/ivan-moskvin/clistatus --locked --root "$HOME/.local" --force
 ```
 
-Turn the check off: `CLAUDESTATUS_NO_AUTO_UPDATE=1`.
+For Codex, repeat `clistatus install codex` after updating the binary.
+`clistatus update` becomes available with the first `clistatus` binary release.
+
+Turn the check off: `CLISTATUS_NO_AUTO_UPDATE=1`.
 
 ## Uninstall
 
 ```bash
-claudestatus uninstall
+clistatus uninstall
 ```
 
 Removes the status line from the settings, the cache, the Divoom panel and the binary itself.
@@ -45,12 +56,16 @@ Removes the status line from the settings, the cache, the Divoom panel and the b
 ## Commands
 
 ```
-claudestatus            status line: session JSON on stdin, line on stdout
-claudestatus check      check whether a new version is out
-claudestatus update     download the latest version and replace itself with it
-claudestatus uninstall  remove the status line, the cache and the binary
-claudestatus divoom     show the limits on a Divoom Times Gate screen
-claudestatus version    print the version
+clistatus            status line: session JSON on stdin, line on stdout
+clistatus install    register the Claude Code status line
+clistatus install codex  install the patched Codex footer transport
+clistatus codex [ARGS]   launch Codex with our colored status line
+clistatus render codex   render a Codex session payload from stdin
+clistatus check      check whether a new version is out
+clistatus update     download the latest version and replace itself with it
+clistatus uninstall  remove the status line, the cache and the binary
+clistatus divoom     show the limits on a Divoom Times Gate screen
+clistatus version    print the version
 ```
 
 ## The status line
@@ -74,20 +89,20 @@ The same limits — on the screen of a [Divoom Times Gate](https://divoom.com/pr
 ![The limits panel on a Divoom Times Gate](divoom.webp)
 
 ```bash
-claudestatus divoom on
+clistatus divoom on
 ```
 
 Finds the device on the network and turns the panel on. From there it updates
 itself while a session is running. It takes the fifth screen, which can be
-changed to any other: `claudestatus divoom screen 3`.
+changed to any other: `clistatus divoom screen 3`.
 
 ```
-claudestatus divoom on [N]       find the devices and turn the panel on device N
-claudestatus divoom off          turn the panel off and give the screen its clock face back
-claudestatus divoom              keep the panel updated (works while running)
-claudestatus divoom once         send the panel once and exit
-claudestatus divoom screen [N]   show or take over screen 1–5
-claudestatus divoom preview FILE save a frame to a file without touching the device
+clistatus divoom on [N]       find the devices and turn the panel on device N
+clistatus divoom off          turn the panel off and give the screen its clock face back
+clistatus divoom              keep the panel updated (works while running)
+clistatus divoom once         send the panel once and exit
+clistatus divoom screen [N]   show or take over screen 1–5
+clistatus divoom preview FILE save a frame to a file without touching the device
 ```
 
 The device draws the panel by downloading a frame, so on every update the screen

@@ -5,6 +5,11 @@
 //! exist for the human only: register in the settings, check for an update and
 //! install it.
 
+mod codex;
+mod codex_agent_hooks;
+mod codex_agents;
+mod codex_launcher;
+mod codex_runtime;
 mod i18n;
 mod install;
 mod panel;
@@ -20,21 +25,24 @@ use i18n::tf;
 /// picked.
 pub type Outcome = Result<(), String>;
 
-const USAGE: &str = "claudestatus — Claude limits in the Claude Code status line.
+const USAGE: &str = "clistatus — Claude and Codex limits in your terminal.
 
 Usage:
-  claudestatus            status line: session JSON on stdin, line on stdout
-  claudestatus install    register in ~/.claude/settings.json
-  claudestatus check      check whether a new version is out
-  claudestatus update     download the latest version and replace itself
-  claudestatus uninstall  remove the status line, the cache and the binary
-  claudestatus divoom     limits panel on a Divoom Times Gate (divoom help)
-  claudestatus version    print the version
-  claudestatus help       this help
+  clistatus            status line: session JSON on stdin, line on stdout
+  clistatus install    register in ~/.claude/settings.json
+  clistatus install codex  install the Codex footer bridge for our renderer
+  clistatus codex [ARGS]   launch Codex with our colored status line
+  clistatus render codex   render Codex session JSON from stdin
+  clistatus check      check whether a new version is out
+  clistatus update     download the latest version and replace itself
+  clistatus uninstall  remove the status line, the cache and the binary
+  clistatus divoom     limits panel on a Divoom Times Gate (divoom help)
+  clistatus version    print the version
+  clistatus help       this help
 
 Environment:
-  CLAUDESTATUS_LANG=ru|en         force the interface language
-  CLAUDESTATUS_NO_AUTO_UPDATE=1   do not check for updates in the background
+  CLISTATUS_LANG=ru|en         force the interface language
+  CLISTATUS_NO_AUTO_UPDATE=1   do not check for updates in the background
 ";
 
 fn main() {
@@ -53,8 +61,24 @@ fn main() {
 
     // --install is still understood: old install scripts spell it that way.
     let result: Outcome = match command.as_str() {
-        "install" | "--install" => install::install(),
-        "uninstall" => install::uninstall(),
+        "agent-task" if args.len() == 3 => codex_agents::register_task(&args[1], &args[2]),
+        "agent-hook" if args.len() == 1 => codex_agents::hook(),
+        "render" if args.get(1).is_some_and(|target| target == "codex") && args.len() == 2 => {
+            statusline::run_codex(None);
+            Ok(())
+        }
+        "codex" => codex_runtime::launch(&args[1..]),
+        "install" | "--install" => match &args[1..] {
+            [] => install::install(),
+            [target] if target == "claude" => install::install(),
+            [target] if target == "codex" => codex_runtime::install(),
+            [target] if target == "codex-native" => codex::install(),
+            _ => Err(i18n::t("Usage: clistatus install [claude|codex]").into()),
+        },
+        "uninstall" if args.get(1).is_some_and(|target| target == "codex") && args.len() == 2 => {
+            codex_runtime::uninstall()
+        }
+        "uninstall" => codex_launcher::uninstall().and_then(|()| install::uninstall()),
         "divoom" => panel::run(&args[1..]),
         "check" => update::check(args.iter().any(|arg| arg == "--quiet")),
         "update" => update::update(),
@@ -84,7 +108,7 @@ fn main() {
 /// The version is stamped into a release build by CI. A hand-made build has
 /// none — such a build counts as outdated and never lights the update mark up.
 pub fn version() -> String {
-    match option_env!("CLAUDESTATUS_VERSION") {
+    match option_env!("CLISTATUS_VERSION") {
         Some(tag) if !tag.is_empty() => tag.to_string(),
         _ => i18n::t("built from source").to_string(),
     }

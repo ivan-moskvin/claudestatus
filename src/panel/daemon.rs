@@ -100,7 +100,7 @@ pub fn drop_lock() {
     }
 }
 
-/// Stops the bridge and cleans up after it. Called from `claudestatus
+/// Stops the bridge and cleans up after it. Called from `clistatus
 /// uninstall`: without this the bridge outlives the deleted binary, while the
 /// screen keeps the panel and goes into endless loading once the bridge does
 /// die.

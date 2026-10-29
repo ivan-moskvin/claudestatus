@@ -1,8 +1,8 @@
 # Builds the binaries on every vX.Y.Z tag and publishes them as a release: both
-# install.sh and the utility itself (claudestatus update) download from it.
+# install.sh and the utility itself (clistatus update) download from it.
 #
 # The asset names are the ones the Go build produced and install.sh still
-# expects — claudestatus_<os>_<arch> — so each target spells its own out rather
+# expects — clistatus_<os>_<arch> — so each target spells its own out rather
 # than deriving it from the Rust triple.
 name: release
 
@@ -17,7 +17,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # A release that fails its tests is worse than no release: `claudestatus
+  # A release that fails its tests is worse than no release: `clistatus
   # update` pulls it down by itself, onto every machine, with nobody asked.
   # Nothing is published until this is green.
   tests:
@@ -34,24 +34,24 @@ jobs:
           # this replaces was static and started anywhere.
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
-            asset: claudestatus_linux_amd64
+            asset: clistatus_linux_amd64
             cross: true
           - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
-            asset: claudestatus_linux_arm64
+            asset: clistatus_linux_arm64
             cross: true
           - target: x86_64-apple-darwin
             os: macos-latest
-            asset: claudestatus_darwin_amd64
+            asset: clistatus_darwin_amd64
           - target: aarch64-apple-darwin
             os: macos-latest
-            asset: claudestatus_darwin_arm64
+            asset: clistatus_darwin_arm64
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            asset: claudestatus_windows_amd64.exe
+            asset: clistatus_windows_amd64.exe
           - target: aarch64-pc-windows-msvc
             os: windows-latest
-            asset: claudestatus_windows_arm64.exe
+            asset: clistatus_windows_arm64.exe
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -73,7 +73,7 @@ jobs:
         env:
           # The version is baked in here: a build made outside a tag has none,
           # counts as outdated and never lights the update mark up.
-          CLAUDESTATUS_VERSION: ${{ github.ref_name }}
+          CLISTATUS_VERSION: ${{ github.ref_name }}
         run: |
           set -eu
           if [ "${{ matrix.cross }}" = "true" ]; then
@@ -83,7 +83,7 @@ jobs:
           fi
 
           mkdir -p dist
-          built="target/${{ matrix.target }}/release/claudestatus"
+          built="target/${{ matrix.target }}/release/clistatus"
           if [ -f "$built.exe" ]; then built="$built.exe"; fi
           cp "$built" "dist/${{ matrix.asset }}"
 
@@ -102,7 +102,7 @@ jobs:
           path: dist
           merge-multiple: true
 
-      # The sha256sum format, which is what `claudestatus update` reads.
+      # The sha256sum format, which is what `clistatus update` reads.
       - name: Checksums
         run: cd dist && sha256sum * > checksums.txt
 

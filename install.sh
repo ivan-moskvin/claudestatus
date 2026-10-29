@@ -1,17 +1,17 @@
 #!/bin/sh
-# Installs claudestatus from the latest release. After that the utility looks
-# after itself: claudestatus update to update, claudestatus uninstall to remove.
+# Installs clistatus from the latest release. After that the utility looks
+# after itself: clistatus update to update, clistatus uninstall to remove.
 #
-#   curl -fsSL https://raw.githubusercontent.com/ivan-moskvin/claudestatus/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/ivan-moskvin/clistatus/main/install.sh | sh
 set -eu
 
-REPO="ivan-moskvin/claudestatus"
-BIN_DIR="${CLAUDESTATUS_BIN_DIR:-$HOME/.local/bin}"
+REPO="ivan-moskvin/clistatus"
+BIN_DIR="${CLISTATUS_BIN_DIR:-$HOME/.local/bin}"
 
 # The messages follow the system language, the same way the binary picks it:
-# CLAUDESTATUS_LANG wins, then the locale variables. Every language is one
+# CLISTATUS_LANG wins, then the locale variables. Every language is one
 # branch here — nothing below chooses wording again.
-case "${CLAUDESTATUS_LANG:-${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}}" in
+case "${CLISTATUS_LANG:-${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}}" in
     ru*)
         m_unknown_os="Неизвестная система: %s — соберите из исходников.\n"
         m_unknown_arch="Неизвестная архитектура: %s — соберите из исходников.\n"
@@ -44,7 +44,7 @@ case "$(uname -m)" in
     *) printf "$m_unknown_arch" "$(uname -m)" >&2; exit 1 ;;
 esac
 
-asset="claudestatus_${os}_${arch}"
+asset="clistatus_${os}_${arch}"
 base="https://github.com/$REPO/releases/latest/download"
 
 # Linux has sha256sum, macOS has shasum.
@@ -61,7 +61,7 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 printf "$m_downloading" "$asset"
-curl -fsSL "$base/$asset" -o "$tmp/claudestatus"
+curl -fsSL "$base/$asset" -o "$tmp/clistatus"
 curl -fsSL "$base/checksums.txt" -o "$tmp/checksums.txt"
 
 want="$(grep " \*\{0,1\}$asset\$" "$tmp/checksums.txt" | cut -d' ' -f1)"
@@ -69,14 +69,14 @@ if [ -z "$want" ]; then
     printf "$m_no_checksum" "$asset" >&2
     exit 1
 fi
-if [ "$want" != "$(sha256 "$tmp/claudestatus")" ]; then
+if [ "$want" != "$(sha256 "$tmp/clistatus")" ]; then
     printf "$m_bad_checksum" >&2
     exit 1
 fi
 
 mkdir -p "$BIN_DIR"
-chmod +x "$tmp/claudestatus"
-mv "$tmp/claudestatus" "$BIN_DIR/claudestatus"
-printf "$m_installed" "$BIN_DIR/claudestatus"
+chmod +x "$tmp/clistatus"
+mv "$tmp/clistatus" "$BIN_DIR/clistatus"
+printf "$m_installed" "$BIN_DIR/clistatus"
 
-"$BIN_DIR/claudestatus" install
+"$BIN_DIR/clistatus" install

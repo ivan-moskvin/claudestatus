@@ -10,7 +10,7 @@ mod ru;
 
 use std::sync::OnceLock;
 
-/// A language tag, spelled the way `CLAUDESTATUS_LANG` accepts it.
+/// A language tag, spelled the way `CLISTATUS_LANG` accepts it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Lang {
     En,
@@ -98,8 +98,9 @@ fn catalog(lang: Lang) -> Option<&'static [(&'static str, &'static str)]> {
 /// An explicit override wins over the system, so a Russian desktop can still be
 /// checked in English while debugging.
 fn detect() -> Lang {
-    if let Some(lang) = std::env::var("CLAUDESTATUS_LANG")
+    if let Some(lang) = std::env::var("CLISTATUS_LANG")
         .ok()
+        .or_else(|| std::env::var("CLAUDESTATUS_LANG").ok())
         .and_then(|value| parse(&value))
     {
         return lang;
