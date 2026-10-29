@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="109" height="20" role="img" aria-label="dependencies: 6">
-  <title>dependencies: 6</title>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="109" height="20" role="img" aria-label="dependencies: 9">
+  <title>dependencies: 9</title>
   <linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>
   <clipPath id="r"><rect width="109" height="20" rx="3" fill="#fff"/></clipPath>
   <g clip-path="url(#r)">
@@ -10,7 +10,7 @@
   <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="110">
     <text aria-hidden="true" x="450" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="780">dependencies</text>
     <text x="450" y="140" transform="scale(.1)" textLength="780">dependencies</text>
-    <text aria-hidden="true" x="990" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="70">6</text>
-    <text x="990" y="140" transform="scale(.1)" textLength="70">6</text>
+    <text aria-hidden="true" x="990" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="70">9</text>
+    <text x="990" y="140" transform="scale(.1)" textLength="70">9</text>
   </g>
 </svg>

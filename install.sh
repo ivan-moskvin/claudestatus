@@ -79,4 +79,4 @@ chmod +x "$tmp/clistatus"
 mv "$tmp/clistatus" "$BIN_DIR/clistatus"
 printf "$m_installed" "$BIN_DIR/clistatus"
 
-"$BIN_DIR/clistatus" install
+"$BIN_DIR/clistatus" install "$@"

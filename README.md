@@ -17,31 +17,30 @@ The Linux build is statically linked, so the distribution and its glibc do not m
 macOS and Linux:
 
 ```bash
-cargo install --git https://github.com/ivan-moskvin/clistatus --locked --root "$HOME/.local"
-"$HOME/.local/bin/clistatus" install
+curl -fsSL https://raw.githubusercontent.com/ivan-moskvin/clistatus/main/install.sh | sh
 ```
 
 Windows (PowerShell):
 
 ```powershell
-cargo install --git https://github.com/ivan-moskvin/clistatus --locked
-clistatus install
+irm https://raw.githubusercontent.com/ivan-moskvin/clistatus/main/install.ps1 | iex
 ```
 
-Source installation requires Rust 1.88 or newer. The release installers will
-be available after the first release with `clistatus` binaries.
+For the Codex footer on Apple Silicon macOS:
 
-For the Codex footer on Apple Silicon macOS, run `clistatus install codex`,
-then start a new `codex` session and approve the agent hooks through `/hooks`.
+```bash
+curl -fsSL https://raw.githubusercontent.com/ivan-moskvin/clistatus/main/install.sh | sh -s -- codex
+```
+
+Start a new `codex` session and approve the agent hooks through `/hooks`.
 
 ## Update
 
 ```bash
-cargo install --git https://github.com/ivan-moskvin/clistatus --locked --root "$HOME/.local" --force
+clistatus update
 ```
 
 For Codex, repeat `clistatus install codex` after updating the binary.
-`clistatus update` becomes available with the first `clistatus` binary release.
 
 Turn the check off: `CLISTATUS_NO_AUTO_UPDATE=1`.
 
